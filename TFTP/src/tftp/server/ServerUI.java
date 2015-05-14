@@ -37,7 +37,7 @@ public class ServerUI {
 		
 		public ServerThread() {
 			super("TFTPServer");
-			server = new Server(false);
+			server = new Server();
 		}
 		
 		@Override

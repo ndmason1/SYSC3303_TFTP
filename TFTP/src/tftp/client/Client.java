@@ -18,7 +18,9 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
+import tftp.Logger;
 import tftp.Util;
+import tftp.net.PacketUtil;
 import tftp.net.Receiver;
 import tftp.net.Sender;
 
@@ -31,23 +33,19 @@ public class Client {
 
 	private DatagramSocket sendReceiveSocket;
 	private DatagramPacket sendPacket, receivePacket;
-	private boolean debug;
-
-	public Client(boolean debug) {
+	private Logger logger;
+	
+	public Client() {
 		try {
 			sendReceiveSocket = new DatagramSocket();
 		} catch (SocketException se) {
 			se.printStackTrace();
 			System.exit(1);
 		}
-		this.debug = debug;
-				
-		printDebug("===== CLIENT STARTED =====\n");
+		
+		logger = Logger.getInstance();				
 	}
 	
-	private void printDebug(String msg) {
-		if (debug) System.out.println(msg);
-	}
 	public void cleanup() {
 		sendReceiveSocket.close();
 	}
@@ -98,7 +96,7 @@ public class Client {
 	
 	public void sendReadRequest(String filename, String mode) {
 		
-		System.out.printf("Starting read of file %s from server...\n", filename);
+		logger.log(String.format("Starting read of file %s from server...", filename));
 		
 		byte[] payload = prepareReadRequestPayload(filename, mode);		
 
@@ -110,7 +108,7 @@ public class Client {
 			System.exit(1);
 		}
 		
-		if (debug) Util.printPacketInfo(sendPacket, true);
+		logger.printPacketInfo(sendPacket, true);
 
 		
 		try {
@@ -121,9 +119,7 @@ public class Client {
 		}
 		
 		byte data[] = new byte[Util.BUF_SIZE];
-		receivePacket = new DatagramPacket(data, data.length);
-		
-		printDebug("waiting for data...");
+		receivePacket = new DatagramPacket(data, data.length);		
 		
 		try {			  
 			sendReceiveSocket.receive(receivePacket);
@@ -139,8 +135,7 @@ public class Client {
 	}
 
 	public void sendWriteRequest(String filename, String mode) {
-		
-		System.out.printf("Starting write of file %s to server...\n", filename);
+		logger.log(String.format("Starting write of file %s from server...", filename));
 
 		byte[] payload = prepareWriteRequestPayload(filename, mode);
 		
@@ -152,7 +147,7 @@ public class Client {
 			System.exit(1);
 		}
 
-		if (debug) Util.printPacketInfo(sendPacket, true);
+		logger.printPacketInfo(sendPacket, true);
 
 		// send packet to server
 		try {
@@ -164,7 +159,7 @@ public class Client {
 
 
 		// create recv packet
-		byte data[] = new byte[Util.BUF_SIZE];
+		byte data[] = new byte[PacketUtil.BUF_SIZE];
 		receivePacket = new DatagramPacket(data, data.length);
 		
 		try {			  
@@ -173,7 +168,7 @@ public class Client {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		if (debug) Util.printPacketInfo(receivePacket, false);
+		logger.printPacketInfo(receivePacket, false);
 
 		// TODO: verify ack packet
 		
@@ -190,7 +185,7 @@ public class Client {
 	}
 
 	public static void main(String[] args) {
-		Client c = new Client(true);
+		Client c = new Client();
 		
 //		c.sendReadRequest("etc/test_a_0B.txt", "octet");
 //		c.sendReadRequest("etc/test_b_40B.txt", "octet");

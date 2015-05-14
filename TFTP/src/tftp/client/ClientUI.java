@@ -10,7 +10,7 @@ public class ClientUI {
 	
 	public ClientUI() {
 		keyboard = new Scanner(System.in);
-		client = new Client(false);
+		client = new Client();
 	}
 	
 	public void showUI() {		
@@ -72,8 +72,10 @@ public class ClientUI {
 		
 		if (type.equals("r")) {
 			client.sendReadRequest(filename, mode);
+			System.out.printf("Transfer of file \"%s\" finished.\n\n", filename);
 		} else if (type.equals("w")) {
 			client.sendWriteRequest(filename, mode);
+			System.out.printf("Transfer of file \"%s\" finished.\n\n", filename);
 		} else {
 			System.out.println("Invalid request type.");
 			printHelp();

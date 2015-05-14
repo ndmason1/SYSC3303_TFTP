@@ -15,68 +15,42 @@ import java.net.UnknownHostException;
 
 
 
+
+import tftp.Logger;
 import tftp.Util;
 
 public class Sender {
 
-	private int segmentID;
-	private int reSendCount;
-	private byte[] msg, buffer;
 	private FileInputStream fileReader;
 	private DatagramSocket socket;
-	private int fileLength, currentPos, bytesRead;    
-	private final int packetOverhead = 106; // packet overhead
-
-	private InetAddress receiverIP;
-	private int receiverPort;
-	
-	private PacketUtil packetUtil;
-
-
-	private final static byte READ_FLAG = 0x01;
-	private final static byte WRITE_FLAG = 0x02;
-	private final static byte ACK_FLAG = 0x04;
-	private final static byte DATA_FLAG = 0x03;
+	private int fileLength, bytesRead;
+	private InetAddress receiverIP;	
+	private PacketUtil packetUtil;	
+	private Logger logger;
 
 	public Sender(DatagramSocket socket, int receiverTID){
 		
-
 		try {
 			receiverIP = InetAddress.getLocalHost();
 		} catch (UnknownHostException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		receiverPort = receiverTID;
 		this.socket = socket;		
 		packetUtil = new PacketUtil(receiverIP, receiverTID);
-	}
-
-	public Sender(DatagramSocket socket, DatagramPacket initPacket, int recvTID) throws IOException
-	{
-		msg = new byte[512];
-		buffer = new byte[512];
-		socket = socket;
-
-		//setup DatagramSocket with correct Inetaddress and port of receiver
-		socket.connect(initPacket.getAddress(), initPacket.getPort());
-		segmentID = 0;
-
-		receiverIP = InetAddress.getLocalHost();
-		receiverPort = recvTID;
+		logger = Logger.getInstance();
 	}
 
 	public void sendFile(File theFile) throws IOException {
 		fileReader = new FileInputStream(theFile);
 		fileLength = fileReader.available();
 		int blockNum = 1;
-		int currentPos = 0;
 
-		System.out.println("*** Filename: " + theFile.getName() + " ***");
-		System.out.println("*** Bytes to send: " + fileLength + " ***");
+		logger.log("*** Filename: " + theFile.getName() + " ***");
+		logger.log("*** Bytes to send: " + fileLength + " ***");
 		
-		byte[] sendBuf = new byte[512];
-		byte[] recvBuf = new byte[512];
+		byte[] sendBuf = new byte[PacketUtil.BUF_SIZE];
+		byte[] recvBuf = new byte[PacketUtil.BUF_SIZE];
 
 		boolean done = false;
 		do		
@@ -91,20 +65,20 @@ public class Sender {
 			DatagramPacket sendPacket = packetUtil.formDataPacket(sendBuf, bytesRead, blockNum);
 			
 			
-			System.out.println("Sending segment " + blockNum + " with " + bytesRead + " byte payload.");
+			logger.log(String.format("Sending segment %d with %d byte payload.", blockNum, bytesRead));
 			
 			socket.send(sendPacket);
-			Util.printPacketInfo(sendPacket, true);
+			logger.printPacketInfo(sendPacket, true);
 			
 			DatagramPacket reply = new DatagramPacket(recvBuf, recvBuf.length);
 	        
             try
             {
-            	System.out.println("waiting for ACK...");
+            	logger.log(String.format("waiting for ACK %d", blockNum));
                 socket.receive(reply);                
-                Util.printPacketInfo(reply, false);
+                logger.printPacketInfo(reply, false);
             } catch (SocketTimeoutException e) {
-            	// we are assuming no errors for now, so ignore this case
+            	// we are assuming no network errors for now, so ignore this case
             	return;
             }
             
@@ -115,18 +89,11 @@ public class Sender {
             }
             
 			blockNum++;
-			currentPos += bytesRead;
 			
 		} while (!done);
 		
-		System.out.println("*** finished transfer ***");
-		System.out.println("========================================\n");
+		logger.log("*** finished transfer ***");
+		logger.log("========================================\n");
 	}
-
-	public static void main(String args[]) {
-	}
-
-
-
 
 }

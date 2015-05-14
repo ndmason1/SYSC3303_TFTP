@@ -8,10 +8,12 @@ public class PacketUtil {
 	private InetAddress receiverIP;
 	private int receiverPort;
 	
-	private final static byte READ_FLAG = 0x01;
-	private final static byte WRITE_FLAG = 0x02;
-	private final static byte ACK_FLAG = 0x04;
-	private final static byte DATA_FLAG = 0x03;	
+	public final static byte READ_FLAG = 0x01;
+	public final static byte WRITE_FLAG = 0x02;
+	public final static byte ACK_FLAG = 0x04;
+	public final static byte DATA_FLAG = 0x03;
+	
+	public final static int BUF_SIZE = 1024;
 	
 	public PacketUtil(InetAddress receiverIP, int receiverPort) {
 		this.receiverIP = receiverIP;
@@ -114,7 +116,7 @@ public class PacketUtil {
 		int val = ((high & 0xff) << 8) | (low & 0xff);
 		return val;		
 	}
-	
+		
 	public static void main(String args[]) {
 		int blockNum = 0;
 		byte[] bytes = PacketUtil.getBlockNumberBytes(blockNum);
