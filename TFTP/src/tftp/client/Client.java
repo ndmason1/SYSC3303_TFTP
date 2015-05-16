@@ -189,7 +189,7 @@ public class Client{
 		}
 	}
 
-	//Client side I/O handling
+	//Client side I/O handling code by Syed Taqi ----///
 	public String getFolder(){
 		return Folder;
 	}
@@ -208,7 +208,7 @@ public class Client{
 	public void getFile(String filename){
 		String Pathfile = getFolder() + filename;
 		try {
-			//Check write permissions
+			//Check if the disk is already full
 			File file = new File(Pathfile);
 
 			do {
@@ -228,7 +228,7 @@ public class Client{
 
 
 
-	}
+	} //I/O handling code updated by Syed upto here!!
 
 	public static void main(String[] args) {
 		Client c = new Client();

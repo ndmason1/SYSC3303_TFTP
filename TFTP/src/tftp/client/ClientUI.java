@@ -64,21 +64,47 @@ public class ClientUI {
 			printHelp();
 			return;
 		}		
-		
+		//----Client UI Updated by Syed----//
 		if (!new File(filename).exists()) {
 			System.out.println("File does not exist.");
 			printHelp();
 			return;
 		}
-		
+		//Checking if user can read the file
 		if (!new File(filename).canRead()){System.out.println("Cannot Read file");
 		printHelp();
 		return;}
 		
+		//Checking if the file already exists?
 		if (new File(filename).exists()){
 			System.out.println("File Already Exist");
+			Scanner in = new Scanner(System.in);
+			String userinput;
 
-		}
+			//Allowing a user to input so that a user can Replace the file if the file already exists
+			//If can't replace the file then a transfer will not be completed, 
+			//And/or otherwise it will prompt an invalid request
+			while (true){
+				System.out.println("Do you want replace it: Y or N");
+				userinput = in.nextLine();
+				if(userinput == "y"|| userinput=="Y"){
+					new File(filename).delete();
+					System.out.println("File has been deleted");
+					in.close();
+					break;
+				}
+				if (userinput == "n" || userinput =="N"){
+					System.out.println("Choose not replace a file, transfer can not complete");
+					in.close();
+					System.exit(1);
+					break;
+				}
+				System.out.println("invalide request, try again");
+			}
+
+			
+
+		} //ClientUI Updated by Syed upto here!
 
 		if (type.equals("r")) {
 			client.sendReadRequest(filename, mode);
