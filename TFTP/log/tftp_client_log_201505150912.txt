@@ -1,6 +1,0 @@
-[DEBUG] waiting for ACK 49
-[DEBUG] Sending segment 50 with 0 byte payload.
-[DEBUG] waiting for ACK 50
-[DEBUG] *** finished transfer ***
-[DEBUG] ========================================
-

@@ -1,5 +1,0 @@
-[DEBUG] DATA 48 received
-[DEBUG] sending ACK 49
-[DEBUG] waiting for next DATA segment...
-[DEBUG] DATA 49 received
-[DEBUG] sending ACK 50
