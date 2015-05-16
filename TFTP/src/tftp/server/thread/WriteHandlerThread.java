@@ -65,7 +65,7 @@ public class WriteHandlerThread extends WorkerThread {
 		PacketUtil packetUtil = new PacketUtil(reqPacket.getAddress(), reqPacket.getPort());
 		DatagramPacket initAck = packetUtil.formAckPacket(0);
 		
-		logger.printPacketInfo(initAck, true);
+		logger.logPacketInfo(initAck, true);
 		
 		try {
 			sendRecvSocket.send(initAck);
@@ -83,7 +83,7 @@ public class WriteHandlerThread extends WorkerThread {
 			e.printStackTrace();
 		}
 		
-		logger.printPacketInfo(receivePacket, false);
+		logger.logPacketInfo(receivePacket, false);
 		
 		Receiver r = new Receiver(sendRecvSocket, receivePacket.getPort());
 		r.receiveFile(receivePacket);

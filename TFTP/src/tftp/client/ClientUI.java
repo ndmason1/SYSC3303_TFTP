@@ -51,8 +51,9 @@ public class ClientUI {
 		}
 		
 		String filename = args[0];
-		String type = args[1];
-		String mode = args[2];
+		String type = args[1].toLowerCase();
+		String mode = args[2].toLowerCase();
+		
 				
 		if (mode.equals("n")) {
 			mode = "netascii";

@@ -46,8 +46,8 @@ public class Sender {
 		fileLength = fileReader.available();
 		int blockNum = 1;
 
-		logger.log("*** Filename: " + theFile.getName() + " ***");
-		logger.log("*** Bytes to send: " + fileLength + " ***");
+		logger.debug("*** Filename: " + theFile.getName() + " ***");
+		logger.debug("*** Bytes to send: " + fileLength + " ***");
 		
 		byte[] sendBuf = new byte[PacketUtil.BUF_SIZE];
 		byte[] recvBuf = new byte[PacketUtil.BUF_SIZE];
@@ -65,18 +65,18 @@ public class Sender {
 			DatagramPacket sendPacket = packetUtil.formDataPacket(sendBuf, bytesRead, blockNum);
 			
 			
-			logger.log(String.format("Sending segment %d with %d byte payload.", blockNum, bytesRead));
+			logger.debug(String.format("Sending segment %d with %d byte payload.", blockNum, bytesRead));
 			
 			socket.send(sendPacket);
-			logger.printPacketInfo(sendPacket, true);
+			logger.logPacketInfo(sendPacket, true);
 			
 			DatagramPacket reply = new DatagramPacket(recvBuf, recvBuf.length);
 	        
             try
             {
-            	logger.log(String.format("waiting for ACK %d", blockNum));
+            	logger.debug(String.format("waiting for ACK %d", blockNum));
                 socket.receive(reply);                
-                logger.printPacketInfo(reply, false);
+                logger.logPacketInfo(reply, false);
             } catch (SocketTimeoutException e) {
             	// we are assuming no network errors for now, so ignore this case
             	return;
@@ -92,8 +92,8 @@ public class Sender {
 			
 		} while (!done);
 		
-		logger.log("*** finished transfer ***");
-		logger.log("========================================\n");
+		logger.debug("*** finished transfer ***");
+		logger.debug("========================================\n");
 	}
 
 }

@@ -18,6 +18,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
+import tftp.LogUser;
 import tftp.Logger;
 import tftp.Util;
 import tftp.net.PacketUtil;
@@ -29,7 +30,7 @@ import tftp.net.Sender;
  * This class implements a client program that sends TFTP connection requests to a server.
  *
  */
-public class Client {	 
+public class Client implements LogUser {	 
 
 	private DatagramSocket sendReceiveSocket;
 	private DatagramPacket sendPacket, receivePacket;
@@ -43,7 +44,8 @@ public class Client {
 			System.exit(1);
 		}
 		
-		logger = Logger.getInstance();				
+		logger = Logger.getInstance();
+		logger.setLabel(this);
 	}
 	
 	public void cleanup() {
@@ -96,7 +98,7 @@ public class Client {
 	
 	public void sendReadRequest(String filename, String mode) {
 		
-		logger.log(String.format("Starting read of file %s from server...", filename));
+		logger.info(String.format("Starting read of file %s from server...", filename));
 		
 		byte[] payload = prepareReadRequestPayload(filename, mode);		
 
@@ -108,7 +110,7 @@ public class Client {
 			System.exit(1);
 		}
 		
-		logger.printPacketInfo(sendPacket, true);
+		logger.logPacketInfo(sendPacket, true);
 
 		
 		try {
@@ -135,7 +137,7 @@ public class Client {
 	}
 
 	public void sendWriteRequest(String filename, String mode) {
-		logger.log(String.format("Starting write of file %s from server...", filename));
+		logger.info(String.format("Starting write of file %s from server...", filename));
 
 		byte[] payload = prepareWriteRequestPayload(filename, mode);
 		
@@ -147,7 +149,7 @@ public class Client {
 			System.exit(1);
 		}
 
-		logger.printPacketInfo(sendPacket, true);
+		logger.logPacketInfo(sendPacket, true);
 
 		// send packet to server
 		try {
@@ -168,7 +170,7 @@ public class Client {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		logger.printPacketInfo(receivePacket, false);
+		logger.logPacketInfo(receivePacket, false);
 
 		// TODO: verify ack packet
 		
@@ -198,6 +200,11 @@ public class Client {
 		c.sendWriteRequest("etc/test_c_512B.txt", "octet");
 		
 		c.cleanup();
+	}
+
+	@Override
+	public String getLogLabel() {		
+		return "client";
 	}
 
 

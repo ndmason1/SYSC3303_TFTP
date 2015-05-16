@@ -4,6 +4,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+import javax.naming.ConfigurationException;
+
+import tftp.Logger.LogLevel;
+
 public class Config {
 	
 	private static Properties prop;
@@ -26,8 +30,14 @@ public class Config {
  		
 	}
 	
-	public static boolean getDebug() {
-		return Boolean.parseBoolean(prop.getProperty("debug"));
+	public static LogLevel getLogLevel() throws ConfigurationException {
+		String levelStr = prop.getProperty("log_level").toUpperCase();
+		for (LogLevel level : LogLevel.values()) {
+			if (level.name().equals(levelStr))
+				return level;
+		}
+		
+		throw new ConfigurationException("bad config value specified for log_level");
 	}
 
 }

@@ -36,13 +36,13 @@ public class Receiver
 		DatagramPacket receivePacket = new DatagramPacket(data, data.length);
 		
 		int blockNum = packetUtil.parseDataPacket(initPacket);
-		logger.log(String.format("DATA %d received", blockNum));
-		logger.printPacketInfo(initPacket, false);
+		logger.debug(String.format("DATA %d received", blockNum));
+		logger.logPacketInfo(initPacket, false);
 		
 		// send ACK for initial data packet
 		DatagramPacket sendPacket = packetUtil.formAckPacket(blockNum);
-		logger.log(String.format("sending ACK %d", blockNum));			
-		logger.printPacketInfo(sendPacket, true);
+		logger.debug(String.format("sending ACK %d", blockNum));			
+		logger.logPacketInfo(sendPacket, true);
 		
 		try {
 			socket.send(sendPacket);
@@ -56,15 +56,15 @@ public class Receiver
 		
 		while (!done) {
 			// wait for response
-			logger.log("waiting for next DATA segment...");
+			logger.debug("waiting for next DATA segment...");
 			try {			  
 				socket.receive(receivePacket);
 			} catch(IOException e) {
 				e.printStackTrace();
 				System.exit(1);
 			}
-			logger.log(String.format("DATA %d received", blockNum));
-			logger.printPacketInfo(initPacket, false);
+			logger.debug(String.format("DATA %d received", blockNum));
+			logger.logPacketInfo(initPacket, false);
 			
 			if (receivePacket.getLength() < 516) {
 				done = true;
@@ -74,8 +74,8 @@ public class Receiver
 			blockNum = packetUtil.parseDataPacket(receivePacket);
 			// TODO verify block num
 			sendPacket = packetUtil.formAckPacket(blockNum);
-			logger.log(String.format("sending ACK %d", blockNum));			
-			logger.printPacketInfo(sendPacket, true);
+			logger.debug(String.format("sending ACK %d", blockNum));			
+			logger.logPacketInfo(sendPacket, true);
 			
 			try {
 				socket.send(sendPacket);
@@ -84,7 +84,6 @@ public class Receiver
 				System.exit(1);
 			}
 		}
-		logger.log("*** finished transfer ***");
-		logger.log("========================================\n");
+		logger.debug("*** finished transfer ***");
     }
 }

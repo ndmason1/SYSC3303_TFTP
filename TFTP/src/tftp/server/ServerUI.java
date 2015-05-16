@@ -14,16 +14,17 @@ public class ServerUI {
 		System.out.println("TFTP server running [v1.0 - LOCALHOST ONLY] (press Q to terminate) ");
 		System.out.println("Waiting for requests...");
 		
-		Thread t = new ServerThread();
-		t.start();
+		ServerThread st = new ServerThread();
+		st.start();
 		
 		String input = keyboard.nextLine();
 		input = input.replaceAll(" ", "");
 		if (!input.isEmpty())
 			if (input.charAt(0) == 'Q' || input.charAt(0) == 'q')
 			{
-				System.out.println("\nTerminating...");
-				System.exit(0);
+				System.out.println("\nFinishing remaining transfers and terminating...");
+				st.shutdown();
+				//System.exit(0);
 			}
 		
 	}
@@ -44,9 +45,13 @@ public class ServerUI {
 		public void run() {
 			try {
 				server.serveRequests();
-			} finally {
+			} finally {				
 				server.cleanup();
 			}
+		}
+		
+		public void shutdown() {
+			server.finishProcessing();
 		}
 	}
 
