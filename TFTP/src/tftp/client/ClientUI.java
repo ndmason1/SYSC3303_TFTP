@@ -75,7 +75,11 @@ public class ClientUI {
 		printHelp();
 		return;}
 		
-		
+		if (new File(filename).exists()){
+			System.out.println("File Already Exist");
+
+		}
+
 		if (type.equals("r")) {
 			client.sendReadRequest(filename, mode);
 			System.out.printf("Transfer of file \"%s\" finished.\n\n", filename);

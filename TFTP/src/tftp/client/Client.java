@@ -11,14 +11,16 @@
 package tftp.client;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
+import java.util.*;
 
-import tftp.LogUser;
 import tftp.Logger;
 import tftp.Util;
 import tftp.net.PacketUtil;
@@ -30,12 +32,12 @@ import tftp.net.Sender;
  * This class implements a client program that sends TFTP connection requests to a server.
  *
  */
-public class Client implements LogUser {	 
+public class Client{	 
 
 	private DatagramSocket sendReceiveSocket;
-	private DatagramPacket sendPacket, receivePacket;
+	private DatagramPacket sendPacket, receivePacket, ErrorPkt;
 	private Logger logger;
-	
+	private String Folder = System.getProperty("user.dir")+"/Client_files";
 	public Client() {
 		try {
 			sendReceiveSocket = new DatagramSocket();
@@ -43,20 +45,19 @@ public class Client implements LogUser {
 			se.printStackTrace();
 			System.exit(1);
 		}
-		
-		logger = Logger.getInstance();
-		logger.setLabel(this);
+
+		logger = Logger.getInstance();				
 	}
-	
+
 	public void cleanup() {
 		sendReceiveSocket.close();
 	}
 
 	private byte[] prepareReadRequestPayload(String filename, String mode) {		
-		
+
 		int msgLength = filename.length() + mode.length() + 4; 
 		byte msg[] = new byte[msgLength];
-		
+
 		// preamble
 		msg[0] = 0x00;
 		msg[1] = 0x01;
@@ -70,15 +71,15 @@ public class Client implements LogUser {
 		byte[] mbytes = mode.getBytes(); 
 		System.arraycopy(mbytes, 0, msg, 3+fbytes.length, mbytes.length);
 		msg[fbytes.length + mbytes.length + 3] = 0x00;
-		
+
 		return msg;
 	}
-	
+
 	private byte[] prepareWriteRequestPayload(String filename, String mode) {
-		
+
 		int msgLength = filename.length() + mode.length() + 4; 
 		byte msg[] = new byte[msgLength];
-		
+
 		// preamble
 		msg[0] = 0x00;
 		msg[1] = 0x02;
@@ -92,14 +93,14 @@ public class Client implements LogUser {
 		byte[] mbytes = mode.getBytes(); 
 		System.arraycopy(mbytes, 0, msg, 3+fbytes.length, mbytes.length);
 		msg[fbytes.length + mbytes.length + 3] = 0x00;
-		
+
 		return msg;
 	}	
-	
+
 	public void sendReadRequest(String filename, String mode) {
-		
+
 		logger.info(String.format("Starting read of file %s from server...", filename));
-		
+
 		byte[] payload = prepareReadRequestPayload(filename, mode);		
 
 		// create send packet
@@ -109,27 +110,28 @@ public class Client implements LogUser {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		
+
 		logger.logPacketInfo(sendPacket, true);
 
-		
+
 		try {
 			sendReceiveSocket.send(sendPacket);
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		
+
 		byte data[] = new byte[Util.BUF_SIZE];
 		receivePacket = new DatagramPacket(data, data.length);		
-		
+
 		try {			  
 			sendReceiveSocket.receive(receivePacket);
+			getFile(filename);
 		} catch(IOException e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		
+
 		// TODO: verify data packet
 		// assume our request is good, set up a receiver to proceed with the transfer
 		Receiver r = new Receiver(sendReceiveSocket,receivePacket.getPort());
@@ -140,7 +142,7 @@ public class Client implements LogUser {
 		logger.info(String.format("Starting write of file %s from server...", filename));
 
 		byte[] payload = prepareWriteRequestPayload(filename, mode);
-		
+
 		// create send packet
 		try {
 			sendPacket = new DatagramPacket(payload, payload.length, InetAddress.getLocalHost(), 69);
@@ -163,9 +165,10 @@ public class Client implements LogUser {
 		// create recv packet
 		byte data[] = new byte[PacketUtil.BUF_SIZE];
 		receivePacket = new DatagramPacket(data, data.length);
-		
+
 		try {			  
 			sendReceiveSocket.receive(receivePacket);
+			getFile(filename);
 		} catch(IOException e) {
 			e.printStackTrace();
 			System.exit(1);
@@ -173,10 +176,10 @@ public class Client implements LogUser {
 		logger.logPacketInfo(receivePacket, false);
 
 		// TODO: verify ack packet
-		
-		
+
+
 		// assume our request is good, set up a sender to proceed with the transfer
-		
+
 		Sender s = new Sender(sendReceiveSocket,receivePacket.getPort());
 		try {
 			s.sendFile(new File(filename));
@@ -186,26 +189,63 @@ public class Client implements LogUser {
 		}
 	}
 
+	//Client side I/O handling
+	public String getFolder(){
+		return Folder;
+	}
+
+
+	public void sendDiscFull(String msg){
+		try{
+			ErrorPkt ep = receivePacket.errorPkt(ErrorPkt.ErrorType.DISC_FULL_OR_ALLOCATION_EXCEEDED,msg);
+			send(ep);
+			logger.printpacketinfo(ErrorPkt.ErrorType.DISC_FULL_OR_ALLOCATION_EXCEEDED,msg);
+		} catch (IOException e){
+			e.printStackTrace();
+		}
+	}
+
+	public void getFile(String filename){
+		String Pathfile = getFolder() + filename;
+		try {
+			//Check write permissions
+			File file = new File(Pathfile);
+
+			do {
+
+				if (file.getUsableSpace() < receivePacket.getLength()){
+				    sendReceiveSocket.close();
+					throw new IOException("Disk Full, Can not complete transfer, Please clean Disk");
+				}
+
+
+			} while ( receivePacket.getLength() == 512);
+			sendReceiveSocket.close();
+		} catch (IOException e){
+			e.printStackTrace();
+			System.exit(1);
+		}
+
+
+
+	}
+
 	public static void main(String[] args) {
 		Client c = new Client();
-		
-//		c.sendReadRequest("etc/test_a_0B.txt", "octet");
-//		c.sendReadRequest("etc/test_b_40B.txt", "octet");
-//		c.sendReadRequest("etc/test_c_512B.txt", "octet");
-//		c.sendReadRequest("etc/test_d_984B.txt", "octet");
-//		c.sendReadRequest("etc/test_e_15MB.jar", "octet");
-		
+
+		//		c.sendReadRequest("etc/test_a_0B.txt", "octet");
+		//		c.sendReadRequest("etc/test_b_40B.txt", "octet");
+		//		c.sendReadRequest("etc/test_c_512B.txt", "octet");
+		//		c.sendReadRequest("etc/test_d_984B.txt", "octet");
+		//		c.sendReadRequest("etc/test_e_15MB.jar", "octet");
+
 		c.sendWriteRequest("etc/test_a_0B.txt", "octet");
 		c.sendWriteRequest("etc/test_b_40B.txt", "octet");
 		c.sendWriteRequest("etc/test_c_512B.txt", "octet");
-		
+
 		c.cleanup();
 	}
-
-	@Override
-	public String getLogLabel() {		
-		return "client";
-	}
-
-
 }
+
+
+
