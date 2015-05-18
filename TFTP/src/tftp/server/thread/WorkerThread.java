@@ -9,13 +9,47 @@ import tftp.Logger;
 
 public abstract class WorkerThread extends Thread {
 	
-	protected DatagramPacket reqPacket, sendPacket, receivePacket;
+	/**
+	 * The initial request packet.
+	 */
+	protected DatagramPacket reqPacket;
+	
+	/**
+	 * The packet used to send messages to the client.
+	 */
+	protected DatagramPacket sendPacket;
+	
+	/**
+	 * The packet used to receive messages from the client.
+	 */
+	protected DatagramPacket receivePacket;
+	
+	/**
+	 * A socket which is created and used only for the request to which this thread is assigned.
+	 */
 	protected DatagramSocket sendReceiveSocket;	
+	
+	/**
+	 * InetAddress of the client machine.
+	 */
 	protected InetAddress clientIP;
+	
+	/**
+	 * Port number of the client process.
+	 */
 	protected int clientPort;
+	
+	/**
+	 * Logger object used for logging debug/error messages.
+	 */
 	protected Logger logger;
-
-	public WorkerThread(DatagramPacket reqPacket) {
+		
+	/**
+	 * Constructs a WorkerThread. 
+	 *
+	 * @param  reqPacket  the packet containing the client's request
+	 */
+	protected WorkerThread(DatagramPacket reqPacket) {
 		this.reqPacket = reqPacket;
 		clientIP = reqPacket.getAddress();
 		clientPort = reqPacket.getPort();
@@ -30,10 +64,16 @@ public abstract class WorkerThread extends Thread {
 		logger = Logger.getInstance();
 	}
 	
+	/**
+	 * Closes the resources used by this thread.
+	 */
 	protected void cleanup() {
 		sendReceiveSocket.close();
 	}
 	
+	/**
+	 * Overrides Thread's run method (to be implemented by subclasses).
+	 */	
 	@Override
 	public abstract void run();
 

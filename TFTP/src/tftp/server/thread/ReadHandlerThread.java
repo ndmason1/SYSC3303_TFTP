@@ -9,12 +9,25 @@ import java.net.SocketException;
 import tftp.exception.InvalidRequestException;
 import tftp.net.Sender;
 
-public class ReadHandlerThread extends WorkerThread {
-
+/**
+ * A specialized thread that processes TFTP read requests received by a TFTP server.
+ */
+public class ReadHandlerThread extends WorkerThread {	
+	
+	/**
+	 * Constructs a ReadHandlerThread. Passes the DatagramPacket argument to 
+	 * the WorkerThread constructor. 
+	 *
+	 * @param  reqPacket  the packet containing the client's request
+	 */
 	public ReadHandlerThread(DatagramPacket reqPacket) {
 		super(reqPacket);
 	}	
 
+	/**
+	 * Runs this thread, which processes a TFTP read request and starts a 
+	 * file transfer.
+	 */
 	@Override
 	public void run() {
 		byte[] data = reqPacket.getData();

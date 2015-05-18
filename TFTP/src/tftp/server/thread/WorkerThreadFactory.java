@@ -5,9 +5,19 @@ import java.net.DatagramPacket;
 import tftp.exception.TFTPPacketException;
 import tftp.net.PacketUtil;
 
-public class WorkerThreadFactory {
+/**
+ * A factory class for creating WorkerThread instances.
+ */
+public class WorkerThreadFactory {	
 
-	public WorkerThread createWorkerThread(DatagramPacket reqPacket) throws TFTPPacketException {
+	/**
+	 * Creates and returns a WorkerThread. The type of WorkerThread returned
+	 * is determined by the request type.
+	 * 
+	 * @param  reqPacket  the packet containing the client's request
+	 * @return            a new WorkerThread
+	 */
+	public WorkerThread createWorkerThread(DatagramPacket reqPacket) throws TFTPPacketException {		
 		
 		byte[] data = reqPacket.getData();
 		

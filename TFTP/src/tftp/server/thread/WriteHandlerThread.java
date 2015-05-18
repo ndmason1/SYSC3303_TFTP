@@ -6,17 +6,28 @@ import java.net.DatagramSocket;
 import java.net.SocketException;
 
 import tftp.exception.InvalidRequestException;
-import tftp.Util;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
 
+/**
+ * A specialized thread that processes TFTP write requests received by a TFTP server.
+ */
 public class WriteHandlerThread extends WorkerThread {
-
+	
+	/**
+	 * Constructs a WriteHandlerThread. Passes the DatagramPacket argument to 
+	 * the WorkerThread constructor. 
+	 *
+	 * @param  reqPacket  the packet containing the client's request
+	 */
 	public WriteHandlerThread(DatagramPacket reqPacket) {
 		super(reqPacket);
 	}
 	
-
+	/**
+	 * Runs this thread, which processes a TFTP write request and starts a 
+	 * file transfer.
+	 */
 	@Override
 	public void run() {
 		byte[] data = reqPacket.getData();
