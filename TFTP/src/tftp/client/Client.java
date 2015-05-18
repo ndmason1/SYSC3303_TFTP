@@ -11,15 +11,14 @@
 package tftp.client;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-import java.util.*;
+
 
 import tftp.Logger;
 import tftp.Util;
@@ -35,9 +34,9 @@ import tftp.net.Sender;
 public class Client{	 
 
 	private DatagramSocket sendReceiveSocket;
-	private DatagramPacket sendPacket, receivePacket, ErrorPkt;
+	private DatagramPacket sendPacket, receivePacket;
 	private Logger logger;
-	private String Folder = System.getProperty("user.dir")+"/Client_files";
+	
 	public Client() {
 		try {
 			sendReceiveSocket = new DatagramSocket();
@@ -126,7 +125,7 @@ public class Client{
 
 		try {			  
 			sendReceiveSocket.receive(receivePacket);
-			getFile(filename);
+			
 		} catch(IOException e) {
 			e.printStackTrace();
 			System.exit(1);
@@ -168,7 +167,7 @@ public class Client{
 
 		try {			  
 			sendReceiveSocket.receive(receivePacket);
-			getFile(filename);
+			
 		} catch(IOException e) {
 			e.printStackTrace();
 			System.exit(1);
@@ -188,47 +187,6 @@ public class Client{
 			e.printStackTrace();
 		}
 	}
-
-	//Client side I/O handling code by Syed Taqi ----///
-	public String getFolder(){
-		return Folder;
-	}
-
-
-	public void sendDiscFull(String msg){
-		try{
-			ErrorPkt ep = receivePacket.errorPkt(ErrorPkt.ErrorType.DISC_FULL_OR_ALLOCATION_EXCEEDED,msg);
-			send(ep);
-			logger.printpacketinfo(ErrorPkt.ErrorType.DISC_FULL_OR_ALLOCATION_EXCEEDED,msg);
-		} catch (IOException e){
-			e.printStackTrace();
-		}
-	}
-
-	public void getFile(String filename){
-		String Pathfile = getFolder() + filename;
-		try {
-			//Check if the disk is already full
-			File file = new File(Pathfile);
-
-			do {
-
-				if (file.getUsableSpace() < receivePacket.getLength()){
-				    sendReceiveSocket.close();
-					throw new IOException("Disk Full, Can not complete transfer, Please clean Disk");
-				}
-
-
-			} while ( receivePacket.getLength() == 512);
-			sendReceiveSocket.close();
-		} catch (IOException e){
-			e.printStackTrace();
-			System.exit(1);
-		}
-
-
-
-	} //I/O handling code updated by Syed upto here!!
 
 	public static void main(String[] args) {
 		Client c = new Client();
