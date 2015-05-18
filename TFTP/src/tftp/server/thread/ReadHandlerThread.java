@@ -31,7 +31,26 @@ public class ReadHandlerThread extends WorkerThread {
 			i++;
 		}
 		String filename = sb.toString();
+		//\\//\\//\\ File Not Found - Error Code 1 //\\//\\//\\
 
+				//Opens an input stream
+				File f = new File(filename);
+				if(!f.exists()){    //file doesn't exist
+
+					byte errorCode = 1;   //error code 1 : file not found
+					DatagramPacket error= OPcodeError.OPerror("FILE NOT FOUND",errorCode);  //create error packet
+					error.setAddress(reqPacket.getAddress());
+					error.setPort(69);		
+
+					try {			   
+						sendReceiveSocket.send(error);			   
+					} catch (IOException ex) {			   
+						ex.printStackTrace();			   
+						System.exit(1);			   
+					}			   
+					sendReceiveSocket.close();			   
+					return;
+				}
 		// move index to start of mode string
 		i++;		
 
