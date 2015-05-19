@@ -94,8 +94,6 @@ public class ClientUI {
 				}
 				if (userinput == "n" || userinput =="N"){
 					System.out.println("Choose not replace a file, transfer can not complete");
-					in.close();
-					System.exit(1);
 					break;
 				}
 				System.out.println("invalide request, try again");
@@ -119,7 +117,7 @@ public class ClientUI {
 	
 	private void cleanup() {
 		keyboard.close();
-		Client.clean
+		client.cleanup();
 		
 	}
 	
