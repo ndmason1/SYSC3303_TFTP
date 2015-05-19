@@ -78,7 +78,7 @@ public class ClientUI {
 		//Checking if the file already exists?
 		if (new File(filename).exists()){
 			System.out.println("File Already Exist");
-			Scanner in = new Scanner(System.in);
+			
 			String userinput;
 
 			//Allowing a user to input so that a user can Replace the file if the file already exists
@@ -86,11 +86,10 @@ public class ClientUI {
 			//And/or otherwise it will prompt an invalid request
 			while (true){
 				System.out.println("Do you want replace it: Y or N");
-				userinput = in.nextLine();
+				userinput = keyboard.nextLine();
 				if(userinput == "y"|| userinput=="Y"){
 					new File(filename).delete();
 					System.out.println("File has been deleted");
-					in.close();
 					break;
 				}
 				if (userinput == "n" || userinput =="N"){
@@ -118,9 +117,22 @@ public class ClientUI {
 		}
 	}
 	
-	public static void main(String args[]) {
-		new ClientUI().showUI();
+	private void cleanup() {
+		keyboard.close();
+		Client.clean
+		
 	}
+	
+	public static void main(String args[]) {
+		ClientUI ui = new ClientUI(); 
+		try {
+			ui.showUI();
+		} finally {
+			ui.cleanup();
+		}
+	}
+
+	
 	
 
 }

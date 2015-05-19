@@ -98,16 +98,6 @@ public class Server implements LogUser {
 			activatedThreads.add(worker);
 		}
 	}
-	public static void main( String args[] )
-	{
-		Server s = new Server();
-		try {
-			s.serveRequests();
-		} finally {
-			s.finishProcessing();
-			s.cleanup();
-		}
-	}
 
 	public void finishProcessing() {
 		acceptNewConnections = false;
