@@ -1,11 +1,9 @@
 /*
- * Intermediary.java
- * TEAM 1
+ * ErrorSimulator.java
  * 
- * Last updated: 07/05/2015
+ * Authors: TEAM 1
  * 
  * This file was created specifically for the course SYSC 3303.
- * 
  */
 
 package tftp.sim;
@@ -17,7 +15,6 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
-import tftp.ILogUser;
 import tftp.Logger;
 import tftp.Util;
 import tftp.net.PacketUtil;
@@ -28,7 +25,7 @@ import tftp.net.PacketUtil;
  * between a TFTP client and server.
  *
  */
-public class ErrorSimulator implements ILogUser {
+public class ErrorSimulator {
 	private DatagramPacket sendPacket, receivePacket;
 
 	private DatagramSocket sendReceiveSocket;
@@ -151,11 +148,5 @@ public class ErrorSimulator implements ILogUser {
 		} finally {
 			in.cleanup();
 		}
-	}
-
-	@Override
-	public String getLogLabel() {
-		// TODO Auto-generated method stub
-		return null;
 	}
 }

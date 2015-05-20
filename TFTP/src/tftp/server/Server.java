@@ -1,12 +1,11 @@
 /*
  * Server.java
  * 
- * Author: Nigel Mason
- * Last updated: 07/05/2015
+ * Authors: TEAM 1
  * 
  * This file was created specifically for the course SYSC 3303.
- * Copyright (C) Nigel Mason, 2015 - All rights reserved
  */
+
 
 package tftp.server;
 
@@ -22,12 +21,10 @@ import java.util.Set;
 import tftp.exception.InvalidRequestException;
 import tftp.exception.TFTPPacketException;
 import tftp.Config;
-import tftp.ILogUser;
 import tftp.Logger;
 import tftp.Util;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
-import tftp.net.ISendReceiver;
 import tftp.net.Sender;
 import tftp.server.thread.WorkerThread;
 import tftp.server.thread.WorkerThreadFactory;
@@ -37,7 +34,7 @@ import tftp.server.thread.WorkerThreadFactory;
  * This class implements a TFTP server.
  *
  */
-public class Server implements ILogUser {
+public class Server {
 	private DatagramPacket receivePacket;
 	private DatagramSocket receiveSocket;
 	
@@ -88,6 +85,7 @@ public class Server implements ILogUser {
 				System.exit(1);
 			}			
 			
+			logger.logPacketInfo(receivePacket, false);
 			logger.info(String.format("Request received. Creating handler thread %d", threadCount));
 			// spawn a thread to process request
 			WorkerThread worker = null;
@@ -114,9 +112,4 @@ public class Server implements ILogUser {
 		}
 	}
 	
-	@Override
-	public String getLogLabel() {		
-		return "server";
-	}
-
 }

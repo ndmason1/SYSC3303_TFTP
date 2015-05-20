@@ -1,3 +1,14 @@
+/*
+ * ClientJason.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303.
+ * 
+ * 
+ * !!! THIS CODE IS NOT CURRENTLY IN USE !!!
+ */
+
 package tftp;
 
 import java.awt.Dimension;

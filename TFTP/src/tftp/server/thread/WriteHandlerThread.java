@@ -1,5 +1,14 @@
+/*
+ * WriteHandlerThread.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303.
+ */
+
 package tftp.server.thread;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -45,6 +54,24 @@ public class WriteHandlerThread extends WorkerThread {
 			i++;
 		}
 		String filename = sb.toString();
+		String fullpath = Config.getServerDirectory() + filename;
+		
+		File f = new File(fullpath);
+		if(!f.canWrite()){    // no write access
+
+			byte errorCode = 2;   //error code 2 : access violation
+			DatagramPacket error= OPcodeError.OPerror("ACCESS VIOLATION",errorCode);  //create error packet
+			error.setAddress(reqPacket.getAddress());
+			error.setPort(reqPacket.getPort());		
+
+			try {			   
+				sendReceiveSocket.send(error);			   
+			} catch (IOException ex) {			   
+				ex.printStackTrace();
+			}			   
+			sendReceiveSocket.close();			   
+			return;
+		}
 
 		// move index to start of mode string
 		i++;		
@@ -97,7 +124,7 @@ public class WriteHandlerThread extends WorkerThread {
 		
 		logger.logPacketInfo(receivePacket, false);
 		
-		Receiver r = new Receiver(this, sendRecvSocket, receivePacket.getPort());
+		Receiver r = new Receiver(sendRecvSocket, receivePacket.getPort());
 		try {
 			r.receiveFile(receivePacket, Config.getServerDirectory(), filename);
 		} catch (IOException e) {

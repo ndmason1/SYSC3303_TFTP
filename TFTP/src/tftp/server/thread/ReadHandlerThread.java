@@ -1,3 +1,11 @@
+/*
+ * ReadHandlerThread.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303.
+ */
+
 package tftp.server.thread;
 
 import java.io.File;
@@ -49,14 +57,29 @@ public class ReadHandlerThread extends WorkerThread {
 		//\\//\\//\\ File Not Found - Error Code 1 //\\//\\//\\
 
 		//Opens an input stream
-		System.out.println("attempt to open " + fullpath);
 		File f = new File(fullpath);
 		if(!f.exists()){    //file doesn't exist
 
 			byte errorCode = 1;   //error code 1 : file not found
 			DatagramPacket error= OPcodeError.OPerror("FILE NOT FOUND",errorCode);  //create error packet
 			error.setAddress(reqPacket.getAddress());
-			error.setPort(69);		
+			error.setPort(reqPacket.getPort());		
+
+			try {			   
+				sendReceiveSocket.send(error);			   
+			} catch (IOException ex) {			   
+				ex.printStackTrace();
+			}			   
+			sendReceiveSocket.close();			   
+			return;
+		}
+		
+		if(!f.canRead()){    // no read access
+
+			byte errorCode = 2;   //error code 2 : access violation
+			DatagramPacket error= OPcodeError.OPerror("ACCESS VIOLATION",errorCode);  //create error packet
+			error.setAddress(reqPacket.getAddress());
+			error.setPort(reqPacket.getPort());		
 
 			try {			   
 				sendReceiveSocket.send(error);			   
@@ -87,7 +110,7 @@ public class ReadHandlerThread extends WorkerThread {
 
 		// request is good if we made it here
 		// read request, so start a file transfer
-		Sender s = new Sender(this, sendReceiveSocket, clientPort);
+		Sender s = new Sender(sendReceiveSocket, clientPort);
 		try {			
 			s.sendFile(new File(fullpath));
 		} catch (IOException e) {

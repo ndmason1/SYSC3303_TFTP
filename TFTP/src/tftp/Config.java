@@ -1,3 +1,11 @@
+/*
+ * Config.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303. * 
+ */
+
 package tftp;
 
 import java.io.IOException;
@@ -48,6 +56,10 @@ public class Config {
 
 		String str = prop.getProperty("server_dir");
 		return str;
+	}
+	
+	public static boolean getSimulateErrors() {
+		return Boolean.parseBoolean(prop.getProperty("simulate_errors"));
 	}
 
 	public static void main(String[] args) {

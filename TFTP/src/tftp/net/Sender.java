@@ -1,3 +1,11 @@
+/*
+ * Sender.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303.
+ */
+
 package tftp.net;
 
 import java.io.File;
@@ -28,7 +36,7 @@ public class Sender {
 	private PacketUtil packetUtil;	
 	private Logger logger;
 
-	public Sender(ISendReceiver owner, DatagramSocket socket, int receiverTID){
+	public Sender(DatagramSocket socket, int receiverTID){
 		
 		try {
 			receiverIP = InetAddress.getLocalHost();

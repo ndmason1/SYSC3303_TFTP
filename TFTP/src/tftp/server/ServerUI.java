@@ -1,3 +1,12 @@
+/*
+ * ServerUI.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303.
+ */
+
+
 package tftp.server;
 
 import java.util.Scanner;

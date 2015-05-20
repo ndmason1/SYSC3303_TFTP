@@ -1,3 +1,11 @@
+/*
+ * Logger.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303.
+ */
+
 package tftp;
 
 import java.io.BufferedWriter;
@@ -91,7 +99,7 @@ public class Logger {
 	}
 	
 	public void logPacketInfo(DatagramPacket packet, boolean sent) {
-		if (level.value >= LogLevel.DEBUG.value) {
+		if (level.value <= LogLevel.DEBUG.value) {
 			String addrLabel = sent ? "Destination" : "Source";
 			enqueue("==============================");
 			enqueue(String.format("Packet length: %d\n", packet.getLength()));
@@ -130,18 +138,6 @@ public class Logger {
 
 	}
 
-	public void setLabel(ILogUser object) {
-		// assuming our working directory is top level project directory
-		// name log file with timestamp so new ones are created each run
-		StringBuilder sb = new StringBuilder();
-		sb.append("log/tftp_");
-		sb.append(object.getLogLabel());
-		sb.append("_log_");
-		sb.append(new SimpleDateFormat("yyyyMMddhhmm'.txt'").format(new Date()));
-		
-		logFilename = sb.toString();
-	}
-	
 	public void setLabel(String label) {
 		// assuming our working directory is top level project directory
 		// name log file with timestamp so new ones are created each run

@@ -1,3 +1,11 @@
+/*
+ * Receiver.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303.
+ */
+
 package tftp.net;
 
 import java.io.*;
@@ -7,6 +15,7 @@ import java.io.File;
 
 import tftp.Logger;
 import tftp.Util;
+import tftp.server.thread.OPcodeError;
 
 public class Receiver
 {    
@@ -18,7 +27,7 @@ public class Receiver
 	private String Folder = System.getProperty("user.dir")+"/Client_files";
 	static String filename; 			//name of the file
 
-	public Receiver(ISendReceiver owner, DatagramSocket socket, int senderTID){		
+	public Receiver(DatagramSocket socket, int senderTID){		
 
 		try {
 			senderIP = InetAddress.getLocalHost();
@@ -71,42 +80,8 @@ public class Receiver
 			System.exit(1);
 		}
 
-		//Check if the disk is already full, If full generate Error code-3
-		//Copyright- By Syed Taqi - 2015/05/08
-//		
-//
-//		//String Pathfile = getFolder() + filename;
-//		String Pathfile = directoryPath + filename;
-//		try {
-//			File file = new File(Pathfile);
-//			System.out.println("PATH " + Pathfile);
-//
-//			do {
-//				//getUsableSpace() definition taken from here:
-//				//http://stackoverflow.com/questions/21439596/difference-between-getfreespace-and-getusablespace-of-file
-//				//getUsableSpace() - This method returns the number of bytes available to the virtual 
-//				//machine on the partition named by that abstract pathname
-//
-//
-//				if (file.getUsableSpace() < receivePacket.getLength()){
-//					socket.close();
-//					logger.debug(String.format("(3) Disk full, Can not complete transfer, Disk cleanup required"));
-//					throw new IOException("(3):Disk Full, Can not complete transfer, Disk cleanup required");
-//
-//				}
-//
-//
-//			} while ( receivePacket.getLength() == 512);
-//			socket.close();
-//		} catch (IOException e){
-//			e.printStackTrace();
-//			System.exit(1);
-//		}
-		//-------DiskFull Code by Syed Taqi upto here----//
-
 		// check if we are done
-		boolean done = initPacket.getLength() < 516;
-		
+		boolean done = initPacket.getLength() < 516;		
 
 		while (!done) {
 			// wait for response
@@ -120,6 +95,25 @@ public class Receiver
 			}
 			logger.debug(String.format("DATA %d received", blockNum));
 			logger.logPacketInfo(receivePacket, false);
+			
+			//Check if the disk is already full, If full generate Error code-3
+			//By Syed Taqi - 2015/05/08
+			if (theFile.getUsableSpace() < receivePacket.getLength()){				
+				String msg = "Disk full, Can not complete transfer, Disk cleanup required";
+				
+				byte errorCode = 3;
+				DatagramPacket error = packetUtil.formErrorPacket(errorCode, "DISK FULL");	
+
+				try {			   
+					socket.send(error);			   
+				} catch (IOException ex) {			   
+					ex.printStackTrace();
+				}	
+				
+				logger.debug(msg);
+				throw new IOException(msg);
+
+			}
 			
 			dataLength = receivePacket.getLength() - 4;
 			

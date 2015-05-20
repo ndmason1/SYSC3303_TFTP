@@ -1,3 +1,11 @@
+/*
+ * ClientUI.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303.
+ */
+
 package tftp.client;
 
 import java.io.File;
@@ -8,6 +16,8 @@ import java.nio.file.FileAlreadyExistsException;
 import java.util.Scanner;
 
 import tftp.Logger;
+import tftp.exception.TFTPFileIOException;
+import tftp.exception.TFTPPacketException;
 
 public class ClientUI {
 
@@ -79,45 +89,6 @@ public class ClientUI {
 		}
 		fullpath += filename;
 		
-//		//----Client UI Updated by Syed----//
-//		if (!new File(filename).exists()) {
-//			System.out.println("File does not exist.");
-//			printHelp();
-//			return;
-//		}
-//		//Checking if user can read the file
-//		if (!new File(filename).canRead()){System.out.println("Cannot Read file");
-//		printHelp();
-//		return;}
-//		
-//		//Checking if the file already exists?
-//		if (new File(filename).exists()){
-//			System.out.println("File Already Exist");
-//			
-//			String userinput;
-//
-//			//Allowing a user to input so that a user can Replace the file if the file already exists
-//			//If can't replace the file then a transfer will not be completed, 
-//			//And/or otherwise it will prompt an invalid request
-//			while (true){
-//				System.out.println("Do you want replace it: Y or N");
-//				userinput = keyboard.nextLine();
-//				if(userinput == "y"|| userinput=="Y"){
-//					new File(filename).delete();
-//					System.out.println("File has been deleted");
-//					break;
-//				}
-//				if (userinput == "n" || userinput =="N"){
-//					System.out.println("Choose not replace a file, transfer can not complete");
-//					break;
-//				}
-//				System.out.println("invalide request, try again");
-//			}
-//
-//			
-//
-//		} //ClientUI Updated by Syed upto here!
-
 		if (type.equals("r")) {
 			// read request
 			// check that the local (destination) file can be written to
@@ -128,7 +99,8 @@ public class ClientUI {
 			} catch (FileAlreadyExistsException e) {
 				// file exists on the local filesystem, so make sure the user really wants to overwrite
 				while (true){					
-					System.out.println("Destination file already exists. Do you want to replace it? (y/n)");
+					System.out.println("Destination file on local filesystem already exists."); 
+					System.out.println("Do you want to replace it? (y/n)");
 					String userinput = keyboard.nextLine().toLowerCase();
 					if(userinput.equals("y")) {
 						new File(filename).delete();
@@ -145,6 +117,15 @@ public class ClientUI {
 			} catch (IOException e) {
 				System.out.println("Error: IOException caught, couldn't complete request");
 				e.printStackTrace();
+				return;
+			} catch (TFTPFileIOException e) {
+				System.out.println("Error: File IO exception from server");
+				System.out.println(e.getMessage());
+				return;
+			} catch (TFTPPacketException e) {
+				System.out.println("Error: Bad packet received from server");
+				System.out.println(e.getMessage());
+				return;
 			}
 			System.out.printf("Transfer of file \"%s\" finished.\n\n", filename);
 			
@@ -158,6 +139,9 @@ public class ClientUI {
 				return;
 			} catch (FileNotFoundException e) {
 				System.out.println("Error: Source file not found");
+				return;
+			} catch (TFTPFileIOException e) {
+				System.out.println("Error: Source file too big! (Files with size > 33MB not supported)");
 				return;
 			}
 			

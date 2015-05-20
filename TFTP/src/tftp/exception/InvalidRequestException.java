@@ -1,11 +1,9 @@
 /*
  * InvalidRequestException.java
  * 
- * Author: Nigel Mason
- * Last updated: 07/05/2015
+ * Authors: TEAM 1
  * 
  * This file was created specifically for the course SYSC 3303.
- * Copyright (C) Nigel Mason, 2015 - All rights reserved
  */
 
 package tftp.exception;

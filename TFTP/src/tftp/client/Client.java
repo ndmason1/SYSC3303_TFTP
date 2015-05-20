@@ -1,11 +1,9 @@
 /*
  * Client.java
  * 
- * Author: Nigel Mason
- * Last updated: 07/05/2015
+ * Authors: TEAM 1
  * 
  * This file was created specifically for the course SYSC 3303.
- * Copyright (C) Nigel Mason, 2015 - All rights reserved
  */
 
 package tftp.client;
@@ -19,19 +17,16 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
-
-
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
 
-import javax.annotation.processing.FilerException;
-
-import tftp.ILogUser;
+import tftp.Config;
 import tftp.Logger;
 import tftp.Util;
+import tftp.exception.TFTPFileIOException;
+import tftp.exception.TFTPPacketException;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
-import tftp.net.ISendReceiver;
 import tftp.net.Sender;
 
 /**
@@ -39,11 +34,12 @@ import tftp.net.Sender;
  * This class implements a client program that sends TFTP connection requests to a server.
  *
  */
-public class Client implements ILogUser, ISendReceiver {	 
+public class Client {	 
 
 	private DatagramSocket sendReceiveSocket;
 	private DatagramPacket sendPacket, receivePacket;
 	private Logger logger;
+	private int targetPort;
 	
 	public Client() {
 		try {
@@ -52,6 +48,8 @@ public class Client implements ILogUser, ISendReceiver {
 			se.printStackTrace();
 			System.exit(1);
 		}
+		
+		targetPort = Config.getSimulateErrors() ? 68 : 69;
 
 		logger = Logger.getInstance();				
 	}
@@ -74,13 +72,15 @@ public class Client implements ILogUser, ISendReceiver {
 				throw new AccessDeniedException(msg);
 			}
 			
+			
+			
 			throw new FileAlreadyExistsException("destination file exists");			
 
 		}
 		
 	}
 	
-	public void checkValidWriteOperation(String path) throws FileNotFoundException, AccessDeniedException {
+	public void checkValidWriteOperation(String path) throws FileNotFoundException, AccessDeniedException, TFTPFileIOException {
 		
 		File theFile = new File(path);
 		
@@ -92,6 +92,9 @@ public class Client implements ILogUser, ISendReceiver {
 		}
 		if (!theFile.canRead()){			
 			throw new AccessDeniedException("cannot read from source file");
+		}
+		if (theFile.length() > 33553920L){
+			throw new TFTPFileIOException("destination file exists");
 		}
 	}
 
@@ -139,12 +142,13 @@ public class Client implements ILogUser, ISendReceiver {
 		return msg;
 	}	
 
-	public void sendReadRequest(String fullpath, String mode) throws IOException {
+	public void sendReadRequest(String fullpath, String mode) throws IOException, TFTPPacketException, TFTPFileIOException {
 		
 		String[] pathSegments = fullpath.split("\\"+File.separator);
 		String filename = pathSegments[pathSegments.length-1];
 		String dirpath = fullpath.substring(0, fullpath.length() - filename.length());
-		logger.debug("p[ath name is " + dirpath);
+		
+		logger.debug("path name is " + dirpath);
 
 		logger.info(String.format("Starting read of file %s from server...", filename));
 
@@ -152,7 +156,7 @@ public class Client implements ILogUser, ISendReceiver {
 
 		// create send packet
 		try {
-			sendPacket = new DatagramPacket(payload, payload.length, InetAddress.getLocalHost(), 69);
+			sendPacket = new DatagramPacket(payload, payload.length, InetAddress.getLocalHost(), targetPort);
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 			System.exit(1);
@@ -178,10 +182,16 @@ public class Client implements ILogUser, ISendReceiver {
 			e.printStackTrace();
 			System.exit(1);
 		}
+		
+		// check if this is an error packet
+		if (receivePacket.getData()[1] == PacketUtil.ERROR_FLAG) {
+			int errCode = PacketUtil.parseErrorPacket(receivePacket);			
+			String errMsg = PacketUtil.parseErrorPacketMessage(receivePacket);
+			throw new TFTPFileIOException(String.format("(%d) %s",errCode, errMsg));
+		}
 
-		// TODO: verify data packet
 		// assume our request is good, set up a receiver to proceed with the transfer
-		Receiver r = new Receiver(this, sendReceiveSocket, receivePacket.getPort());
+		Receiver r = new Receiver(sendReceiveSocket, receivePacket.getPort());
 		r.receiveFile(receivePacket, dirpath, filename);
 	}
 
@@ -196,7 +206,7 @@ public class Client implements ILogUser, ISendReceiver {
 
 		// create send packet
 		try {
-			sendPacket = new DatagramPacket(payload, payload.length, InetAddress.getLocalHost(), 69);
+			sendPacket = new DatagramPacket(payload, payload.length, InetAddress.getLocalHost(), targetPort);
 		} catch (UnknownHostException e) {
 			e.printStackTrace();
 			System.exit(1);
@@ -231,7 +241,7 @@ public class Client implements ILogUser, ISendReceiver {
 
 		// assume our request is good, set up a sender to proceed with the transfer
 
-		Sender s = new Sender(this, sendReceiveSocket,receivePacket.getPort());
+		Sender s = new Sender(sendReceiveSocket,receivePacket.getPort());
 		try {
 			s.sendFile(new File(fullpath));
 		} catch (IOException e) {
@@ -240,17 +250,6 @@ public class Client implements ILogUser, ISendReceiver {
 		}
 	}
 
-	@Override
-	public String getStoragePath(String path) {		
-		return path;
-	}
-
-	@Override
-	public String getLogLabel() {
-		// TODO Auto-generated method stub
-		return null;
-	}
-	
 	public static void main(String[] args) {
 		Client c = new Client();
 

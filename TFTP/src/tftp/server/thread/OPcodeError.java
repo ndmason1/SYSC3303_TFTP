@@ -1,8 +1,18 @@
+/*
+ * OPcodeError.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303.
+ */
+
 package tftp.server.thread;
 
 import java.net.DatagramPacket;
 
-class OPcodeError {
+import tftp.Logger;
+
+public class OPcodeError {
 	private static byte[] OpcodeErr(byte[] data, byte[] msg, byte errorCode){
 		// opcode
 		data[0] = 0;
@@ -22,8 +32,8 @@ class OPcodeError {
 		byte[] msg = errorMsg.getBytes();
 		byte[] data = new byte[msg.length + 5];            
 		data = OpcodeErr(data, msg, num);
-		DatagramPacket packet = new DatagramPacket(data, data.length);
-		System.out.println(errorMsg);
+		DatagramPacket packet = new DatagramPacket(data, data.length);		
+		Logger.getInstance().error(errorMsg);
 		return packet;
 	}
 

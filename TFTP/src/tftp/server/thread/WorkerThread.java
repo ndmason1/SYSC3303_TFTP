@@ -1,3 +1,11 @@
+/*
+ * WorkerThread.java
+ * 
+ * Authors: TEAM 1
+ * 
+ * This file was created specifically for the course SYSC 3303.
+ */
+
 package tftp.server.thread;
 
 import java.net.DatagramPacket;
@@ -7,9 +15,8 @@ import java.net.SocketException;
 
 import tftp.Config;
 import tftp.Logger;
-import tftp.net.ISendReceiver;
 
-public abstract class WorkerThread extends Thread implements ISendReceiver {
+public abstract class WorkerThread extends Thread {
 	
 	/**
 	 * The initial request packet.
@@ -79,16 +86,5 @@ public abstract class WorkerThread extends Thread implements ISendReceiver {
 	@Override
 	public abstract void run();
 	
-	/**
-	 * Returns a path that should be used by a WorkerThread to find files.
-	 * 
-	 * @param path	the path that the WorkerThread intends to search for a file 
-	 * @return		the Server's main directory 
-	 */
-	@Override
-	public String getStoragePath(String path) {		
-		return Config.getServerDirectory();
-	}
-
 
 }
