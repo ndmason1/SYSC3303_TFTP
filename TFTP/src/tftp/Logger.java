@@ -36,7 +36,7 @@ public class Logger {
 	private String logFilename;
 	private ConcurrentLinkedQueue<String> msgQueue;
 	
-	private final int MAX_QUEUE_SIZE = 5; 
+	private final int MAX_QUEUE_SIZE = 1; // TODO: fix class so we can have a bigger queue size
 	
 	private static Logger instance = null;
 	
@@ -48,7 +48,7 @@ public class Logger {
 			e.printStackTrace();
 		}
 		
-		logFilename = "tftp_log_unkown"; // this should be set by the log user after setting up the Logger
+		logFilename = "tftp_log_unknown"; // this should be set by the log user after setting up the Logger
 		
 		
 		msgQueue = new ConcurrentLinkedQueue<String>();
@@ -116,9 +116,9 @@ public class Logger {
 	 * The try-with-resource statement ensures that the file is closed after writing.
 	 */
 	public void flushMessages() {
-		
+		// TODO: fix so this appends rather than overwrites current log
 		try (Writer writer = new BufferedWriter(new OutputStreamWriter(
-				new FileOutputStream(logFilename), "utf-8"))) {			
+				new FileOutputStream(logFilename, true), "utf-8"))) {			
 			while (!msgQueue.isEmpty()) {				
 				writer.write(msgQueue.poll()+"\n");				
 			}
@@ -130,12 +130,24 @@ public class Logger {
 
 	}
 
-	public void setLabel(LogUser object) {
+	public void setLabel(ILogUser object) {
 		// assuming our working directory is top level project directory
 		// name log file with timestamp so new ones are created each run
 		StringBuilder sb = new StringBuilder();
 		sb.append("log/tftp_");
 		sb.append(object.getLogLabel());
+		sb.append("_log_");
+		sb.append(new SimpleDateFormat("yyyyMMddhhmm'.txt'").format(new Date()));
+		
+		logFilename = sb.toString();
+	}
+	
+	public void setLabel(String label) {
+		// assuming our working directory is top level project directory
+		// name log file with timestamp so new ones are created each run
+		StringBuilder sb = new StringBuilder();
+		sb.append("log/tftp_");
+		sb.append(label);
 		sb.append("_log_");
 		sb.append(new SimpleDateFormat("yyyyMMddhhmm'.txt'").format(new Date()));
 		

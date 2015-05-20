@@ -11,7 +11,7 @@
 package tftp.client;
 
 import java.io.File;
-
+import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -20,10 +20,18 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 
 
+
+import java.nio.file.AccessDeniedException;
+import java.nio.file.FileAlreadyExistsException;
+
+import javax.annotation.processing.FilerException;
+
+import tftp.ILogUser;
 import tftp.Logger;
 import tftp.Util;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
+import tftp.net.ISendReceiver;
 import tftp.net.Sender;
 
 /**
@@ -31,7 +39,7 @@ import tftp.net.Sender;
  * This class implements a client program that sends TFTP connection requests to a server.
  *
  */
-public class Client{	 
+public class Client implements ILogUser, ISendReceiver {	 
 
 	private DatagramSocket sendReceiveSocket;
 	private DatagramPacket sendPacket, receivePacket;
@@ -50,6 +58,41 @@ public class Client{
 
 	public void cleanup() {
 		sendReceiveSocket.close();
+	}
+	
+	public void checkValidReadOperation(String path) throws AccessDeniedException, FileAlreadyExistsException {
+		
+		File theFile = new File(path);
+		
+		//Checking if the file already exists?
+		if (theFile.exists()){
+			
+			//Checking if user can read the file
+			if (!theFile.canWrite()){
+				String msg = "cannot write to destination file";
+				logger.error(msg);
+				throw new AccessDeniedException(msg);
+			}
+			
+			throw new FileAlreadyExistsException("destination file exists");			
+
+		}
+		
+	}
+	
+	public void checkValidWriteOperation(String path) throws FileNotFoundException, AccessDeniedException {
+		
+		File theFile = new File(path);
+		
+		//Checking if the file exists
+		if (!theFile.exists()){
+			String msg = "source file not found: " + path;
+			logger.error(msg);
+			throw new FileNotFoundException("source file does not exist");
+		}
+		if (!theFile.canRead()){			
+			throw new AccessDeniedException("cannot read from source file");
+		}
 	}
 
 	private byte[] prepareReadRequestPayload(String filename, String mode) {		
@@ -96,7 +139,12 @@ public class Client{
 		return msg;
 	}	
 
-	public void sendReadRequest(String filename, String mode) {
+	public void sendReadRequest(String fullpath, String mode) throws IOException {
+		
+		String[] pathSegments = fullpath.split("\\"+File.separator);
+		String filename = pathSegments[pathSegments.length-1];
+		String dirpath = fullpath.substring(0, fullpath.length() - filename.length());
+		logger.debug("p[ath name is " + dirpath);
 
 		logger.info(String.format("Starting read of file %s from server...", filename));
 
@@ -133,11 +181,15 @@ public class Client{
 
 		// TODO: verify data packet
 		// assume our request is good, set up a receiver to proceed with the transfer
-		Receiver r = new Receiver(sendReceiveSocket,receivePacket.getPort());
-		r.receiveFile(receivePacket);		
+		Receiver r = new Receiver(this, sendReceiveSocket, receivePacket.getPort());
+		r.receiveFile(receivePacket, dirpath, filename);
 	}
 
-	public void sendWriteRequest(String filename, String mode) {
+	public void sendWriteRequest(String fullpath, String mode) {
+		
+		String[] pathSegments = fullpath.split("\\"+File.separator);
+		String filename = pathSegments[pathSegments.length-1];
+		
 		logger.info(String.format("Starting write of file %s from server...", filename));
 
 		byte[] payload = prepareWriteRequestPayload(filename, mode);
@@ -179,15 +231,26 @@ public class Client{
 
 		// assume our request is good, set up a sender to proceed with the transfer
 
-		Sender s = new Sender(sendReceiveSocket,receivePacket.getPort());
+		Sender s = new Sender(this, sendReceiveSocket,receivePacket.getPort());
 		try {
-			s.sendFile(new File(filename));
+			s.sendFile(new File(fullpath));
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 
+	@Override
+	public String getStoragePath(String path) {		
+		return path;
+	}
+
+	@Override
+	public String getLogLabel() {
+		// TODO Auto-generated method stub
+		return null;
+	}
+	
 	public static void main(String[] args) {
 		Client c = new Client();
 
@@ -203,6 +266,7 @@ public class Client{
 
 		c.cleanup();
 	}
+
 }
 
 

@@ -2,6 +2,8 @@ package tftp.server;
 
 import java.util.Scanner;
 
+import tftp.Logger;
+
 public class ServerUI {
 
 	private Scanner keyboard;	
@@ -30,6 +32,7 @@ public class ServerUI {
 	}
 	
 	public static void main(String args[]) {
+		Logger.getInstance().setLabel("server");
 		new ServerUI().showUI();
 	}
 	
@@ -47,6 +50,7 @@ public class ServerUI {
 				server.serveRequests();
 			} finally {				
 				server.cleanup();
+				Logger.getInstance().flushMessages();
 			}
 		}
 		

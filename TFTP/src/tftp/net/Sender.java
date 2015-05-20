@@ -28,7 +28,7 @@ public class Sender {
 	private PacketUtil packetUtil;	
 	private Logger logger;
 
-	public Sender(DatagramSocket socket, int receiverTID){
+	public Sender(ISendReceiver owner, DatagramSocket socket, int receiverTID){
 		
 		try {
 			receiverIP = InetAddress.getLocalHost();
@@ -49,7 +49,7 @@ public class Sender {
 		logger.debug("*** Filename: " + theFile.getName() + " ***");
 		logger.debug("*** Bytes to send: " + fileLength + " ***");
 		
-		byte[] sendBuf = new byte[PacketUtil.BUF_SIZE];
+		byte[] sendBuf = new byte[512]; // need to make this exactly our block size so we only read that much
 		byte[] recvBuf = new byte[PacketUtil.BUF_SIZE];
 
 		boolean done = false;

@@ -17,20 +17,23 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
 
+import tftp.ILogUser;
+import tftp.Logger;
 import tftp.Util;
+import tftp.net.PacketUtil;
 
 /**
  * 
- * This class implements a program that relays messages exchanged between a client and a server.
+ * This class implements a an error simulator that can modify messages exchanged 
+ * between a TFTP client and server.
  *
  */
-public class ErrorSimulator {
+public class ErrorSimulator implements ILogUser {
 	private DatagramPacket sendPacket, receivePacket;
 
 	private DatagramSocket sendReceiveSocket;
 	private DatagramSocket receiveSocket;
-	
-	private int reqID; // unique identifier for each request and its response
+	private Logger logger;
 
 	public ErrorSimulator()
 	{
@@ -41,10 +44,10 @@ public class ErrorSimulator {
 		} catch (SocketException se) {
 			se.printStackTrace();
 			System.exit(1);
-		} 
+		}
 		
-		reqID = 1;
-		System.out.println("===== INTERMEDIATE HOST STARTED =====\n");
+		logger = Logger.getInstance();
+		System.out.println("===== ERROR SIMULATOR STARTED =====\n");
 	}
 
 	public void cleanup() {
@@ -56,12 +59,11 @@ public class ErrorSimulator {
 	public void relay()
 	{
 		while (true) {
-			byte data[] = new byte[Util.BUF_SIZE];
+			byte data[] = new byte[PacketUtil.BUF_SIZE];
 			receivePacket = new DatagramPacket(data, data.length);		
 	
 			// wait for a request from the client
-			try {
-				System.out.println("Waiting for request to relay...\n");
+			try {				
 				receiveSocket.receive(receivePacket);
 			} catch (IOException e) {
 				System.out.print("IO Exception: likely:");
@@ -70,8 +72,9 @@ public class ErrorSimulator {
 				System.exit(1);
 			}
 			
-			
-			Util.printPacketInfo(receivePacket, false);
+			logger.debug(String.format("received packet from client at address %s:%d", 
+					receivePacket.getAddress().toString(), receivePacket.getPort()) );
+			logger.logPacketInfo(receivePacket, false);
 	
 			byte[] reqData = receivePacket.getData();
 			InetAddress clientAddr = receivePacket.getAddress();
@@ -84,7 +87,11 @@ public class ErrorSimulator {
 			} catch (UnknownHostException e) {
 				e.printStackTrace();
 				System.exit(1);
-			}			
+			}
+			
+			logger.debug(String.format("sending packet to server at address %s:%d", 
+					sendPacket.getAddress().toString(), sendPacket.getPort()) );
+			logger.logPacketInfo(receivePacket, true);
 		
 			// send the datagram packet to the server via the sendrecv socket 
 			try {
@@ -92,16 +99,10 @@ public class ErrorSimulator {
 			} catch (IOException e) {
 				e.printStackTrace();
 				System.exit(1);
-			}
-			
-			System.out.println("\nRelaying request to server...");
-			Util.printPacketInfo(sendPacket, true);
-			
-			System.out.println("Request sent.");
-			System.out.println("Waiting for response from server...\n");		
+			}		
 	
-			byte replyData[] = new byte[Util.BUF_SIZE];
-			receivePacket = new DatagramPacket(replyData, replyData.length);
+			data = new byte[PacketUtil.BUF_SIZE];
+			receivePacket = new DatagramPacket(data, data.length);
 	
 			// wait for server's response
 			try {			  
@@ -111,11 +112,12 @@ public class ErrorSimulator {
 				System.exit(1);
 			}
 				
-			System.out.printf("Response received for request ID #%d:\n", reqID);
-			Util.printPacketInfo(receivePacket, false);
+			logger.debug(String.format("received packet from server at address %s:%d", 
+					receivePacket.getAddress().toString(), receivePacket.getPort()) );
+			logger.logPacketInfo(receivePacket, false);
 	
 			// create send packet from response data
-			sendPacket = new DatagramPacket(replyData, receivePacket.getLength(), clientAddr, clientPort);
+			sendPacket = new DatagramPacket(data, receivePacket.getLength(), clientAddr, clientPort);
 			
 			// create ephemeral socket to send response to client
 			DatagramSocket sendSocket = null;
@@ -126,8 +128,9 @@ public class ErrorSimulator {
 				System.exit(1);
 			}
 			
-			System.out.println("\nRelaying response to client:");
-			Util.printPacketInfo(sendPacket, true);
+			logger.debug(String.format("sending packet to client at address %s:%d", 
+					sendPacket.getAddress().toString(), sendPacket.getPort()) );
+			logger.logPacketInfo(receivePacket, true);
 	
 			try {
 				sendSocket.send(sendPacket);
@@ -136,18 +139,23 @@ public class ErrorSimulator {
 				System.exit(1);
 			}			
 			
-			sendSocket.close();			
-			System.out.println("========================================\n");			
-			reqID++;
+			sendSocket.close();
 		}
-	}	
-
+	}
+	
 	public static void main(String[] args) {
+		Logger.getInstance().setLabel("errsim");
 		ErrorSimulator in = new ErrorSimulator();
 		try {
 			in.relay();
 		} finally {
 			in.cleanup();
 		}
+	}
+
+	@Override
+	public String getLogLabel() {
+		// TODO Auto-generated method stub
+		return null;
 	}
 }

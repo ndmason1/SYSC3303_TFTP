@@ -5,9 +5,11 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 
+import tftp.Config;
 import tftp.Logger;
+import tftp.net.ISendReceiver;
 
-public abstract class WorkerThread extends Thread {
+public abstract class WorkerThread extends Thread implements ISendReceiver {
 	
 	/**
 	 * The initial request packet.
@@ -76,6 +78,17 @@ public abstract class WorkerThread extends Thread {
 	 */	
 	@Override
 	public abstract void run();
+	
+	/**
+	 * Returns a path that should be used by a WorkerThread to find files.
+	 * 
+	 * @param path	the path that the WorkerThread intends to search for a file 
+	 * @return		the Server's main directory 
+	 */
+	@Override
+	public String getStoragePath(String path) {		
+		return Config.getServerDirectory();
+	}
 
 
 }

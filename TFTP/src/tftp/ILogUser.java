@@ -1,5 +1,5 @@
 package tftp;
 
-public interface LogUser {
+public interface ILogUser {
 	public String getLogLabel();
 }

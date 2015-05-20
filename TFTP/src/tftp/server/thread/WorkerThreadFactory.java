@@ -2,6 +2,7 @@ package tftp.server.thread;
 
 import java.net.DatagramPacket;
 
+import tftp.Config;
 import tftp.exception.TFTPPacketException;
 import tftp.net.PacketUtil;
 
@@ -29,5 +30,4 @@ public class WorkerThreadFactory {
 			throw new TFTPPacketException("expected a request packet");
 		}			
 	}
-
 }

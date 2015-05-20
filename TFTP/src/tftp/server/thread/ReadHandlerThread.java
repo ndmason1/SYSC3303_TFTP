@@ -6,6 +6,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
 
+import tftp.Config;
 import tftp.exception.InvalidRequestException;
 import tftp.net.Sender;
 
@@ -44,26 +45,28 @@ public class ReadHandlerThread extends WorkerThread {
 			i++;
 		}
 		String filename = sb.toString();
+		String fullpath = Config.getServerDirectory() + filename;
 		//\\//\\//\\ File Not Found - Error Code 1 //\\//\\//\\
 
-				//Opens an input stream
-				File f = new File(filename);
-				if(!f.exists()){    //file doesn't exist
+		//Opens an input stream
+		System.out.println("attempt to open " + fullpath);
+		File f = new File(fullpath);
+		if(!f.exists()){    //file doesn't exist
 
-					byte errorCode = 1;   //error code 1 : file not found
-					DatagramPacket error= OPcodeError.OPerror("FILE NOT FOUND",errorCode);  //create error packet
-					error.setAddress(reqPacket.getAddress());
-					error.setPort(69);		
+			byte errorCode = 1;   //error code 1 : file not found
+			DatagramPacket error= OPcodeError.OPerror("FILE NOT FOUND",errorCode);  //create error packet
+			error.setAddress(reqPacket.getAddress());
+			error.setPort(69);		
 
-					try {			   
-						sendReceiveSocket.send(error);			   
-					} catch (IOException ex) {			   
-						ex.printStackTrace();			   
-						System.exit(1);			   
-					}			   
-					sendReceiveSocket.close();			   
-					return;
-				}
+			try {			   
+				sendReceiveSocket.send(error);			   
+			} catch (IOException ex) {			   
+				ex.printStackTrace();
+			}			   
+			sendReceiveSocket.close();			   
+			return;
+		}
+		
 		// move index to start of mode string
 		i++;		
 
@@ -84,9 +87,9 @@ public class ReadHandlerThread extends WorkerThread {
 
 		// request is good if we made it here
 		// read request, so start a file transfer
-		Sender s = new Sender(sendReceiveSocket, clientPort);
+		Sender s = new Sender(this, sendReceiveSocket, clientPort);
 		try {			
-			s.sendFile(new File(filename));
+			s.sendFile(new File(fullpath));
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -95,4 +98,5 @@ public class ReadHandlerThread extends WorkerThread {
 		cleanup();
 
 	}
+
 }

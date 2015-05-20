@@ -21,11 +21,13 @@ import java.util.Set;
 
 import tftp.exception.InvalidRequestException;
 import tftp.exception.TFTPPacketException;
-import tftp.LogUser;
+import tftp.Config;
+import tftp.ILogUser;
 import tftp.Logger;
 import tftp.Util;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
+import tftp.net.ISendReceiver;
 import tftp.net.Sender;
 import tftp.server.thread.WorkerThread;
 import tftp.server.thread.WorkerThreadFactory;
@@ -35,7 +37,7 @@ import tftp.server.thread.WorkerThreadFactory;
  * This class implements a TFTP server.
  *
  */
-public class Server implements LogUser {
+public class Server implements ILogUser {
 	private DatagramPacket receivePacket;
 	private DatagramSocket receiveSocket;
 	
@@ -44,7 +46,7 @@ public class Server implements LogUser {
 	private Logger logger;
 	private boolean acceptNewConnections;
 	private int threadCount;
-	
+	private String mainDirectory;	
 	
 	public Server()
 	{
@@ -57,10 +59,11 @@ public class Server implements LogUser {
 		
 		threadFactory = new WorkerThreadFactory();		
 		logger = Logger.getInstance();
-		logger.setLabel(this);
+		
 		activatedThreads = new HashSet<WorkerThread>();
 		acceptNewConnections = true;
 		threadCount = 0;
+		mainDirectory = Config.getServerDirectory();
 	}
 
 	public void cleanup() {
@@ -115,4 +118,5 @@ public class Server implements LogUser {
 	public String getLogLabel() {		
 		return "server";
 	}
+
 }

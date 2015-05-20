@@ -5,6 +5,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
 
+import tftp.Config;
 import tftp.exception.InvalidRequestException;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
@@ -96,10 +97,14 @@ public class WriteHandlerThread extends WorkerThread {
 		
 		logger.logPacketInfo(receivePacket, false);
 		
-		Receiver r = new Receiver(sendRecvSocket, receivePacket.getPort());
-		r.receiveFile(receivePacket);
-		
-		cleanup();
+		Receiver r = new Receiver(this, sendRecvSocket, receivePacket.getPort());
+		try {
+			r.receiveFile(receivePacket, Config.getServerDirectory(), filename);
+		} catch (IOException e) {
+			logger.error(e.getMessage());
+		} finally {		
+			cleanup();
+		}
 	}
 
 }
