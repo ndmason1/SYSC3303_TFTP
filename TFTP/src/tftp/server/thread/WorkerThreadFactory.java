@@ -36,7 +36,7 @@ public class WorkerThreadFactory {
 		} else if (data[1] == PacketUtil.WRITE_FLAG) {
 			return new WriteHandlerThread(reqPacket);
 		} else {
-			throw new TFTPPacketException("expected a request packet");
+			throw new TFTPPacketException("expected a request packet", PacketUtil.ERR_ILLEGAL_OP);
 		}			
 	}
 }

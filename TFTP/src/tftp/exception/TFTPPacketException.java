@@ -9,13 +9,14 @@
 package tftp.exception;
 
 public class TFTPPacketException extends Exception {
+	
 
 	public TFTPPacketException() {
 		// TODO Auto-generated constructor stub
 	}
 
-	public TFTPPacketException(String arg0) {
-		super(arg0);
+	public TFTPPacketException(String arg0, int errCode) {
+		super(errCode + arg0);
 		// TODO Auto-generated constructor stub
 	}
 

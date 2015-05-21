@@ -26,6 +26,15 @@ public class PacketUtil {
 	public final static byte DATA_FLAG = 0x03;
 	public final static byte ERROR_FLAG = 0x05;
 	
+	public final static byte ERR_UNDEFINED = 0x00;
+	public final static byte ERR_FILE_NOT_FOUND = 0x01;
+	public final static byte ERR_ACCESS_VIOLATION = 0x02;
+	public final static byte ERR_DISK_FULL = 0x03;
+	public final static byte ERR_ILLEGAL_OP = 0x04;
+	public final static byte ERR_UNKNOWN_TID = 0x05;
+	public final static byte ERR_FILE_EXISTS = 0x06;
+	public final static byte ERR_USER_NOT_FOUND = 0x07;
+	
 	public final static int BUF_SIZE = 1024;
 	
 	public PacketUtil(InetAddress receiverIP, int receiverPort) {
@@ -145,7 +154,7 @@ public class PacketUtil {
 			// reject non-printable values
 			if (data[i] < 0x20 || data[i] > 0x7F)
 				throw new TFTPPacketException(
-						String.format("non-printable data inside error message: byte %d",i));			
+						String.format("non-printable data inside error message: byte %d",i), PacketUtil.ERR_ILLEGAL_OP);			
 			i++;
 		}
 		String msg = sb.toString();
