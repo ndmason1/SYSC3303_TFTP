@@ -16,7 +16,6 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.UnknownHostException;
-
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
 
@@ -25,9 +24,11 @@ import tftp.Logger;
 import tftp.Util;
 import tftp.exception.TFTPFileIOException;
 import tftp.exception.TFTPPacketException;
+import tftp.net.PacketParser;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
 import tftp.net.Sender;
+import tftp.exception.*;
 
 /**
  * 
@@ -94,7 +95,7 @@ public class Client {
 			throw new AccessDeniedException("cannot read from source file");
 		}
 		if (theFile.length() > 33553920L){
-			throw new TFTPFileIOException("destination file exists");
+			throw new TFTPFileIOException("destination file exists", PacketUtil.ERR_UNDEFINED);
 		}
 	}
 
@@ -179,17 +180,51 @@ public class Client {
 			sendReceiveSocket.receive(receivePacket);
 			
 		} catch(IOException e) {
-			e.printStackTrace();
+			logger.error(e.getMessage());
 			System.exit(1);
 		}
 		
 		// check if this is an error packet
-		if (receivePacket.getData()[1] == PacketUtil.ERROR_FLAG) {
-			int errCode = PacketUtil.parseErrorPacket(receivePacket);			
-			String errMsg = PacketUtil.parseErrorPacketMessage(receivePacket);
-			throw new TFTPFileIOException(String.format("(%d) %s",errCode, errMsg));
-		}
+        PacketParser parser = new PacketParser();
+       
+        try{
+        	//receive first data packet with block #1
+        	parser.parseDataPacket(receivePacket, 1);
+        }catch(ErrorReceivedException e){
+        	logger.error(e.getMessage());
+            if(e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID){
+            	byte newdata[] = new byte[Util.BUF_SIZE];
+        		receivePacket = new DatagramPacket(newdata, newdata.length);		
 
+        		try {			  
+        			sendReceiveSocket.receive(receivePacket);
+        			
+        		} catch(IOException ea) {
+        			logger.error(ea.getMessage());
+        			System.exit(1);
+        		}
+            }
+            
+            if (e.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP ){
+            	sendReadRequest(fullpath, mode);
+            }
+        }catch(TFTPPacketException ex){
+        	logger.error(ex.getMessage());
+        	PacketUtil packetUtil = new PacketUtil(receivePacket.getAddress(),receivePacket.getPort());
+        	DatagramPacket errPkt = packetUtil.formErrorPacket(ex.getErrorCode(), ex.getMessage());
+        	sendReceiveSocket.send(errPkt);
+        	if (ex.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP){
+        		logger.error("File transfer can not start, terminating");
+        	    return;
+        	}
+        }catch(TFTPFileIOException exs){
+        	logger.error(exs.getMessage());
+        	throw exs;
+        }catch(TFTPException w){
+        	logger.error(w.getMessage());
+        	return;
+        }
+        
 		// assume our request is good, set up a receiver to proceed with the transfer
 		Receiver r = new Receiver(sendReceiveSocket, receivePacket.getPort());
 		r.receiveFile(receivePacket, dirpath, filename);
@@ -233,6 +268,18 @@ public class Client {
 		} catch(IOException e) {
 			e.printStackTrace();
 			System.exit(1);
+		}
+		PacketParser parser = new PacketParser();
+		try{
+		    parser.parseAckPacket(receivePacket, 0);
+		}catch(ErrorReceivedException e){
+			
+		}catch(TFTPPacketException ex){
+			
+		}catch(TFTPFileIOException exs){
+			
+		}catch(TFTPException w){
+			
 		}
 		logger.logPacketInfo(receivePacket, false);
 
