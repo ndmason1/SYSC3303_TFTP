@@ -119,6 +119,15 @@ public class PacketUtil {
 		return errorPacket;
 	}
 	
+	public DatagramPacket formErrorPacket(int errCode, String errMsg, InetAddress recvIP, 
+			int recvPort) {
+		// TODO: make consistent with the rest of this class
+		DatagramPacket errorPacket = OPcodeError.OPerror(errMsg, (byte)errCode);
+		errorPacket.setAddress(recvIP);
+		errorPacket.setPort(recvPort);
+		return errorPacket;
+	}
+	
 	/* return block number or -1 if bad packet */
 	public int parseAckPacket(DatagramPacket packet) {
 		byte[] data = packet.getData();
