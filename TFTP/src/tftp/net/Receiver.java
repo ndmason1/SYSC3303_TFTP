@@ -45,6 +45,7 @@ public class Receiver
 		logger.debug("first packet length: " + initPacket.getLength());
 		logger.debug("first packet data length: " + initPacket.getData().length);
 		
+		
 		File theFile = new File(directoryPath+filename);
 		FileOutputStream fileWriter = new FileOutputStream(theFile);
 		

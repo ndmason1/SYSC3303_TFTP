@@ -12,6 +12,8 @@ package tftp.net;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 
+import tftp.exception.TFTPException;
+import tftp.exception.TFTPFileIOException;
 import tftp.exception.TFTPPacketException;
 
 /**
@@ -54,7 +56,7 @@ public class PacketParser {
 	 * @return 			the filename of the file requested for reading
 	 * @throws 			TFTPPacketException if the packet is badly formatted/corrupted 
 	 */
-	public String parseRRQPacket(DatagramPacket packet) throws TFTPPacketException {
+	public String parseRRQPacket(DatagramPacket packet) throws TFTPException {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
@@ -76,7 +78,7 @@ public class PacketParser {
 	 * @return 			the filename of the file requested for writing
 	 * @throws 			TFTPPacketException if the packet is badly formatted/corrupted 
 	 */
-	public String parseWRQPacket(DatagramPacket packet) throws TFTPPacketException {
+	public String parseWRQPacket(DatagramPacket packet) throws TFTPException {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
@@ -97,7 +99,7 @@ public class PacketParser {
 	 * @param  packet	the packet containing a data block
 	 * @throws 			TFTPPacketException if the packet is badly formatted/corrupted 
 	 */
-	public void parseDataPacket(DatagramPacket packet, int expectedBlockNum) throws TFTPPacketException {
+	public void parseDataPacket(DatagramPacket packet, int expectedBlockNum) throws TFTPException {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
@@ -130,7 +132,7 @@ public class PacketParser {
 	 * @param  packet	the packet containing an ACK in response to a data block
 	 * @throws 			TFTPPacketException if the packet is badly formatted/corrupted 
 	 */
-	public void parseAckPacket(DatagramPacket packet, int expectedBlockNum) throws TFTPPacketException {
+	public void parseAckPacket(DatagramPacket packet, int expectedBlockNum) throws TFTPException {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
@@ -157,22 +159,59 @@ public class PacketParser {
 	/**
 	 * Parses an ERROR packet.
 	 *
-	 * @param  packet	the packet containing a data block
-	 * @return 			the filename of the file requested for reading
-	 * @throws 			TFTPPacketException if the packet is badly formatted/corrupted 
+	 * @param  packet	the packet containing an error code and message
+	 * @throws 			TFTPPacketException if the packet is badly formatted/corrupted
+	 * @throws 			TFTPPacketException if the packet has an unknown TID
+	 * @throws 			TFTPFileIOException if the packet contains a file I/O error
 	 */
-	public String parseErrorPacket(DatagramPacket packet) throws TFTPPacketException {
+	public void parseErrorPacket(DatagramPacket packet) throws TFTPException {
 		byte[] data = packet.getData();
 
 		// check TID
 		checkTID(packet);
 		
 		// check opcode
-		if (data[0] != 0 || data[1] != PacketUtil.DATA_FLAG)
+		if (data[0] != 0 || data[1] != PacketUtil.ERROR_FLAG)
 			throw new TFTPPacketException("bad op code, expected RRQ", PacketUtil.ERR_ILLEGAL_OP);
-
-		// parse the rest of the request
-		return parseRequestPacket(packet);
+		
+		// check error code
+		// expect first byte to be 0 since error codes only go up to 7		
+		if (data[2] != 0 || data[3] < 0 || data[3] > 7)
+			throw new TFTPPacketException("unknown error code", PacketUtil.ERR_ILLEGAL_OP);
+		
+		byte errCode = data[3];
+		
+		// check message		
+		int i = 4;
+		StringBuilder sb = new StringBuilder();
+		while (data[i] != 0x00) {
+			sb.append((char)data[i]);
+			// reject non-printable values
+			if (data[i] < 0x20 || data[i] > 0x7F)
+				throw new TFTPPacketException("non-character byte inside error message", PacketUtil.ERR_ILLEGAL_OP);			
+			i++;
+		}
+		String errMsg = sb.toString();
+		
+		// check length
+		i++;
+		if (i != packet.getLength()) {
+			throw new TFTPPacketException("packet length mismatch", PacketUtil.ERR_ILLEGAL_OP);
+		}
+		
+		// process error
+		switch (errCode) {
+			case PacketUtil.ERR_UNDEFINED:
+			case PacketUtil.ERR_ILLEGAL_OP:
+			case PacketUtil.ERR_UNKNOWN_TID:
+				throw new TFTPPacketException(errMsg, errCode);				
+			case PacketUtil.ERR_FILE_NOT_FOUND:
+			case PacketUtil.ERR_ACCESS_VIOLATION:
+			case PacketUtil.ERR_DISK_FULL:
+			case PacketUtil.ERR_FILE_EXISTS:
+			case PacketUtil.ERR_USER_NOT_FOUND:
+				throw new TFTPFileIOException(errMsg, errCode);				
+		}
 	}
 
 	/**

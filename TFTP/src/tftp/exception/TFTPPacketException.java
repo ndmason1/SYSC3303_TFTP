@@ -8,7 +8,7 @@
 
 package tftp.exception;
 
-public class TFTPPacketException extends Exception {
+public class TFTPPacketException extends TFTPException {
 	
 
 	public TFTPPacketException() {
@@ -16,7 +16,7 @@ public class TFTPPacketException extends Exception {
 	}
 
 	public TFTPPacketException(String arg0, int errCode) {
-		super(errCode + arg0);
+		super(arg0, errCode);
 		// TODO Auto-generated constructor stub
 	}
 

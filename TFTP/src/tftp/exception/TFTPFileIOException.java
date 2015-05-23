@@ -8,14 +8,14 @@
 
 package tftp.exception;
 
-public class TFTPFileIOException extends Exception {
+public class TFTPFileIOException extends TFTPException {
 
 	public TFTPFileIOException() {
 		// TODO Auto-generated constructor stub
 	}
 
-	public TFTPFileIOException(String arg0) {
-		super(arg0);
+	public TFTPFileIOException(String arg0, int errCode) {
+		super(arg0, errCode);
 		// TODO Auto-generated constructor stub
 	}
 
