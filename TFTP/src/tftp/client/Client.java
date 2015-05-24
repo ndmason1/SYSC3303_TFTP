@@ -193,19 +193,12 @@ public class Client {
         }catch(ErrorReceivedException e){
         	logger.error(e.getMessage());
             if(e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID){
-            	byte newdata[] = new byte[Util.BUF_SIZE];
-        		receivePacket = new DatagramPacket(newdata, newdata.length);		
-
-        		try {			  
-        			sendReceiveSocket.receive(receivePacket);
-        			
-        		} catch(IOException ea) {
-        			logger.error(ea.getMessage());
-        			System.exit(1);
-        		}
+            	//request may sent to different port, so resend it
+            	sendReadRequest(fullpath, mode);
             }
             
             if (e.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP ){
+            	//request may damaged, resend it
             	sendReadRequest(fullpath, mode);
             }
         }catch(TFTPPacketException ex){
@@ -230,7 +223,7 @@ public class Client {
 		r.receiveFile(receivePacket, dirpath, filename);
 	}
 
-	public void sendWriteRequest(String fullpath, String mode) {
+	public void sendWriteRequest(String fullpath, String mode) throws TFTPFileIOException{
 		
 		String[] pathSegments = fullpath.split("\\"+File.separator);
 		String filename = pathSegments[pathSegments.length-1];
@@ -273,13 +266,36 @@ public class Client {
 		try{
 		    parser.parseAckPacket(receivePacket, 0);
 		}catch(ErrorReceivedException e){
-			
+			logger.error(e.getMessage());
+            if(e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID){
+            	//request may sent to different port, so resend it
+            	sendWriteRequest(fullpath, mode);
+            }
+            
+            if (e.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP ){
+            	//request may damaged, resend it
+            	sendWriteRequest(fullpath, mode);
+            }
 		}catch(TFTPPacketException ex){
-			
+			logger.error(ex.getMessage());
+			PacketUtil packetUtil = new PacketUtil(receivePacket.getAddress(),receivePacket.getPort());
+        	DatagramPacket errPkt = packetUtil.formErrorPacket(ex.getErrorCode(), ex.getMessage());
+        	try{
+        	    sendReceiveSocket.send(errPkt);
+        	}catch(IOException ew){
+        		logger.error(ew.getMessage());
+        		System.exit(1);
+        	}
+        	if (ex.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP){
+        		logger.error("File transfer can not start, terminating");
+        	    return;
+        	}
 		}catch(TFTPFileIOException exs){
-			
+        	logger.error(exs.getMessage());
+        	throw exs;
 		}catch(TFTPException w){
-			
+        	logger.error(w.getMessage());
+        	return;
 		}
 		logger.logPacketInfo(receivePacket, false);
 
@@ -297,21 +313,6 @@ public class Client {
 		}
 	}
 
-	public static void main(String[] args) {
-		Client c = new Client();
-
-		//		c.sendReadRequest("etc/test_a_0B.txt", "octet");
-		//		c.sendReadRequest("etc/test_b_40B.txt", "octet");
-		//		c.sendReadRequest("etc/test_c_512B.txt", "octet");
-		//		c.sendReadRequest("etc/test_d_984B.txt", "octet");
-		//		c.sendReadRequest("etc/test_e_15MB.jar", "octet");
-
-		c.sendWriteRequest("etc/test_a_0B.txt", "octet");
-		c.sendWriteRequest("etc/test_b_40B.txt", "octet");
-		c.sendWriteRequest("etc/test_c_512B.txt", "octet");
-
-		c.cleanup();
-	}
 
 }
 

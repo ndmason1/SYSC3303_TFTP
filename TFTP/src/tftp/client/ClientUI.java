@@ -144,8 +144,13 @@ public class ClientUI {
 				System.out.println("Error: Source file too big! (Files with size > 33MB not supported)");
 				return;
 			}
-			
-			client.sendWriteRequest(fullpath, mode);
+			try{
+			    client.sendWriteRequest(fullpath, mode);
+			}catch (TFTPFileIOException e){
+				System.out.println(e.getMessage());
+				e.printStackTrace();
+				System.exit(1);
+			}
 			System.out.printf("Transfer of file \"%s\" finished.\n\n", filename);
 		} else {
 			System.out.println("Invalid request type.");
