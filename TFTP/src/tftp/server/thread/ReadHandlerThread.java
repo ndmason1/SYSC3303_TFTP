@@ -81,6 +81,7 @@ public class ReadHandlerThread extends WorkerThread {
 			return;
 			
 		} catch (ErrorReceivedException e) {
+			// the client sent an error packet, so in most cases don't send a response
 			
 			logger.error(e.getMessage());
 			

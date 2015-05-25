@@ -13,8 +13,6 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 
-import javax.swing.text.html.HTMLEditorKit.Parser;
-
 import tftp.Config;
 import tftp.Logger;
 import tftp.net.PacketParser;
