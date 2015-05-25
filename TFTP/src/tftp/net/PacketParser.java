@@ -12,6 +12,7 @@ package tftp.net;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 
+import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
 import tftp.exception.TFTPFileIOException;
 import tftp.exception.TFTPPacketException;
@@ -172,7 +173,7 @@ public class PacketParser {
 		
 		// check opcode
 		if (data[0] != 0 || data[1] != PacketUtil.ERROR_FLAG)
-			throw new TFTPPacketException("bad op code, expected RRQ", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPPacketException("bad op code, expected ERROR", PacketUtil.ERR_ILLEGAL_OP);
 		
 		// check error code
 		// expect first byte to be 0 since error codes only go up to 7		
@@ -199,19 +200,9 @@ public class PacketParser {
 			throw new TFTPPacketException("packet length mismatch", PacketUtil.ERR_ILLEGAL_OP);
 		}
 		
-		// process error
-		switch (errCode) {
-			case PacketUtil.ERR_UNDEFINED:
-			case PacketUtil.ERR_ILLEGAL_OP:
-			case PacketUtil.ERR_UNKNOWN_TID:
-				throw new TFTPPacketException(errMsg, errCode);				
-			case PacketUtil.ERR_FILE_NOT_FOUND:
-			case PacketUtil.ERR_ACCESS_VIOLATION:
-			case PacketUtil.ERR_DISK_FULL:
-			case PacketUtil.ERR_FILE_EXISTS:
-			case PacketUtil.ERR_USER_NOT_FOUND:
-				throw new TFTPFileIOException(errMsg, errCode);				
-		}
+		// the error packet itself is fine, so throw ErrorReceived to let other objects know
+		// that an error occurred on the other end
+		throw new ErrorReceivedException(errMsg, errCode);
 	}
 
 	/**
