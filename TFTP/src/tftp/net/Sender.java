@@ -49,9 +49,19 @@ public class Sender {
 		logger = Logger.getInstance();
 	}
 
-	public void sendFile(File theFile) throws IOException, TFTPException {
-		fileReader = new FileInputStream(theFile);
-		fileLength = fileReader.available();
+	public void sendFile(File theFile) throws TFTPException {
+		try {
+			fileReader = new FileInputStream(theFile);
+		} catch (FileNotFoundException e) {
+			throw new TFTPException(e.getMessage(), PacketUtil.ERR_FILE_NOT_FOUND);
+		}
+		
+		try {
+			fileLength = fileReader.available();
+		} catch (IOException e) {
+			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+		}
+		
 		int blockNum = 1;
 
 		logger.debug("*** Filename: " + theFile.getName() + " ***");
@@ -63,7 +73,11 @@ public class Sender {
 		boolean done = false;
 		do		
 		{
-			bytesRead = fileReader.read(sendBuf);
+			try {
+				bytesRead = fileReader.read(sendBuf);
+			} catch (IOException e) {
+				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+			}
 			if (bytesRead == -1) {
 				bytesRead = 0;				
 			}
@@ -75,91 +89,93 @@ public class Sender {
 
 			logger.debug(String.format("Sending segment %d with %d byte payload.", blockNum, bytesRead));
 
-			socket.send(sendPacket);
+			try {
+				socket.send(sendPacket);
+			} catch (IOException e) {
+				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+			}
 			logger.logPacketInfo(sendPacket, true);
 
 			DatagramPacket reply = new DatagramPacket(recvBuf, recvBuf.length);
 
 			// expect an ACK from the other side
-			try
-			{
-				logger.debug(String.format("waiting for ACK %d", blockNum));
-				socket.receive(reply);                
-				logger.logPacketInfo(reply, false);
+		
+			logger.debug(String.format("waiting for ACK %d", blockNum));
+			try {
+				socket.receive(reply);
+			} catch (IOException e) {
+				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+			}                
+			logger.logPacketInfo(reply, false);
 
-				// parse ACK to ensure it is correct before continuing
-				try {
-					parser.parseAckPacket(reply, blockNum);
+			// parse ACK to ensure it is correct before continuing
+			try {
+				parser.parseAckPacket(reply, blockNum);
 
-				} catch (TFTPPacketException e) {
+			} catch (TFTPPacketException e) {
 
-					logger.error(e.getMessage());
+				logger.error(e.getMessage());
 
-					// send error packet
-					DatagramPacket errPacket = null;
-					
-					if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-						// address packet to the unknown TID
-						errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-								reply.getAddress(), reply.getPort());						
-					} else {
-						// packet will be addressed to recipient as usual					
-						errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-					}
-					
-					try {			   
-						socket.send(errPacket);			   
-					} catch (IOException ex) {			   
-						logger.error(ex.getMessage());						
-						throw ex;
-					}
-					// rethrow so the owner of this Sender knows whats up
-					throw e;
+				// send error packet
+				DatagramPacket errPacket = null;
+				
+				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+					// address packet to the unknown TID
+					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+							reply.getAddress(), reply.getPort());						
+				} else {
+					// packet will be addressed to recipient as usual					
+					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				}
+				
+				try {			   
+					socket.send(errPacket);			   
+				} catch (IOException ex) {			   
+					logger.error(ex.getMessage());						
+					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+				}
+				// rethrow so the owner of this Sender knows whats up
+				throw e;
 
-				} catch (TFTPFileIOException e) {
+			} catch (TFTPFileIOException e) {
 
-					logger.error(e.getMessage());
+				logger.error(e.getMessage());
 
-					// send error packet
+				// send error packet
+				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				try {			   
+					socket.send(errPacket);			   
+				} catch (IOException ex) {			   
+					logger.error(ex.getMessage());
+					return;
+				}
+				
+				// rethrow so the owner of this Sender knows whats up
+				throw e;
+
+			} catch (ErrorReceivedException e) {
+				// the client sent an error packet, so in most cases don't send a response
+
+				logger.error(e.getMessage());
+
+				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+					// send error packet to the unknown TID
 					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 					try {			   
 						socket.send(errPacket);			   
 					} catch (IOException ex) {			   
 						logger.error(ex.getMessage());
-						return;
+						throw e;
 					}
-					
-					// rethrow so the owner of this Sender knows whats up
-					throw e;
-
-				} catch (ErrorReceivedException e) {
-					// the client sent an error packet, so in most cases don't send a response
-
-					logger.error(e.getMessage());
-
-					if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-						// send error packet to the unknown TID
-						DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-						try {			   
-							socket.send(errPacket);			   
-						} catch (IOException ex) {			   
-							logger.error(ex.getMessage());
-							throw e;
-						}
-					}
-					// rethrow so the owner of this Sender knows whats up
-					throw e;
-
-				} catch (TFTPException e) {
-					// this block shouldn't get executed, but needs to be here to compile
-					logger.error(e.getMessage());
-					// rethrow so the owner of this Sender knows whats up
-					throw e;
 				}
-			} catch (SocketTimeoutException e) {
-				// we are assuming no network errors for now, so ignore this case
+				// rethrow so the owner of this Sender knows whats up
+				throw e;
+
+			} catch (TFTPException e) {
+				// this block shouldn't get executed, but needs to be here to compile
 				logger.error(e.getMessage());
-				return;
+				// rethrow so the owner of this Sender knows whats up
+				throw e;
 			}
 
 			// verify ack

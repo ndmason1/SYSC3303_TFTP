@@ -6,7 +6,7 @@ public class ErrorReceivedException extends TFTPException {
 		// TODO Auto-generated constructor stub
 	}
 
-	public ErrorReceivedException(String arg0, int errCode) {
+	public ErrorReceivedException(String arg0, int errCode) {		
 		super(arg0, errCode);
 		// TODO Auto-generated constructor stub
 	}

@@ -61,7 +61,7 @@ public class PacketParser {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
-		if (data[1] != PacketUtil.ERROR_FLAG)
+		if (data[1] == PacketUtil.ERROR_FLAG)
 			parseErrorPacket(packet);
 
 		// check opcode
@@ -83,7 +83,7 @@ public class PacketParser {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
-		if (data[1] != PacketUtil.ERROR_FLAG)
+		if (data[1] == PacketUtil.ERROR_FLAG)
 			parseErrorPacket(packet);
 
 		// check opcode
@@ -104,7 +104,7 @@ public class PacketParser {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
-		if (data[1] != PacketUtil.ERROR_FLAG)
+		if (data[1] == PacketUtil.ERROR_FLAG)
 			parseErrorPacket(packet);
 		
 		// check TID
@@ -137,7 +137,7 @@ public class PacketParser {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
-		if (data[1] != PacketUtil.ERROR_FLAG)
+		if (data[1] == PacketUtil.ERROR_FLAG)
 			parseErrorPacket(packet);		
 		
 		// check TID
@@ -181,7 +181,6 @@ public class PacketParser {
 			throw new TFTPPacketException("unknown error code", PacketUtil.ERR_ILLEGAL_OP);
 		
 		byte errCode = data[3];
-		
 		// check message		
 		int i = 4;
 		StringBuilder sb = new StringBuilder();
@@ -201,7 +200,7 @@ public class PacketParser {
 		}
 		
 		// the error packet itself is fine, so throw ErrorReceived to let other objects know
-		// that an error occurred on the other end
+		// that an error occurred on the other end		
 		throw new ErrorReceivedException(errMsg, errCode);
 	}
 

@@ -53,6 +53,7 @@ public class ReadHandlerThread extends WorkerThread {
 			filename = packetParser.parseRRQPacket(reqPacket);
 			
 		} catch (TFTPPacketException e) {
+			e.printStackTrace();
 			
 			logger.error(e.getMessage());
 			
@@ -60,21 +61,23 @@ public class ReadHandlerThread extends WorkerThread {
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {			   
+			} catch (IOException ex) {			
+				ex.printStackTrace();
 				logger.error(ex.getMessage());
 				return;
 			}
 			return;
 			
 		} catch (TFTPFileIOException e) {
-			
+			e.printStackTrace();
 			logger.error(e.getMessage());
 			
 			// send error packet to client
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {			   
+			} catch (IOException ex) {	
+				ex.printStackTrace();
 				logger.error(ex.getMessage());
 				return;
 			}
@@ -82,7 +85,7 @@ public class ReadHandlerThread extends WorkerThread {
 			
 		} catch (ErrorReceivedException e) {
 			// the client sent an error packet, so in most cases don't send a response
-			
+			e.printStackTrace();
 			logger.error(e.getMessage());
 			
 			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
@@ -90,13 +93,15 @@ public class ReadHandlerThread extends WorkerThread {
 				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 				try {			   
 					sendReceiveSocket.send(errPacket);			   
-				} catch (IOException ex) {			   
+				} catch (IOException ex) {	
+					ex.printStackTrace();
 					logger.error(ex.getMessage());
 					return;
 				}
 			} else return;
 			
 		} catch (TFTPException e) {
+			e.printStackTrace();
 			// this block shouldn't get executed, but needs to be here to compile
 			logger.error(e.getMessage());
 		}
@@ -109,14 +114,14 @@ public class ReadHandlerThread extends WorkerThread {
 		File f = new File(fullpath);
 		if(!f.exists()){    //file doesn't exist
 
-			byte errorCode = 1;   //error code 1 : file not found
+			byte errorCode = PacketUtil.ERR_FILE_NOT_FOUND;   //error code 1 : file not found
 			DatagramPacket error= OPcodeError.OPerror("FILE NOT FOUND",errorCode);  //create error packet
 			error.setAddress(reqPacket.getAddress());
 			error.setPort(reqPacket.getPort());		
 
 			try {			   
-				sendReceiveSocket.send(error);			   
-			} catch (IOException ex) {			   
+				sendReceiveSocket.send(error);
+			} catch (IOException ex) {				
 				ex.printStackTrace();
 			}			   
 			sendReceiveSocket.close();			   
@@ -125,7 +130,7 @@ public class ReadHandlerThread extends WorkerThread {
 		
 		if(!f.canRead()){    // no read access
 
-			byte errorCode = 2;   //error code 2 : access violation
+			byte errorCode = PacketUtil.ERR_ACCESS_VIOLATION;   //error code 2 : access violation
 			DatagramPacket error= OPcodeError.OPerror("ACCESS VIOLATION",errorCode);  //create error packet
 			error.setAddress(reqPacket.getAddress());
 			error.setPort(reqPacket.getPort());		
@@ -144,9 +149,10 @@ public class ReadHandlerThread extends WorkerThread {
 		Sender s = new Sender(sendReceiveSocket, clientPort);
 		try {			
 			s.sendFile(new File(fullpath));
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
+		} catch (TFTPException e) {
 			e.printStackTrace();
+			System.out.println("ERROR CODE " + e.getErrorCode());
+			System.out.println(e.getMessage());
 		}
 		
 		cleanup();

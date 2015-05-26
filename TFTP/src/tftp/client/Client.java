@@ -22,6 +22,7 @@ import java.nio.file.FileAlreadyExistsException;
 import tftp.Config;
 import tftp.Logger;
 import tftp.Util;
+import tftp.exception.TFTPException;
 import tftp.exception.TFTPFileIOException;
 import tftp.exception.TFTPPacketException;
 import tftp.net.PacketParser;
@@ -59,7 +60,7 @@ public class Client {
 		sendReceiveSocket.close();
 	}
 	
-	public void checkValidReadOperation(String path) throws AccessDeniedException, FileAlreadyExistsException {
+	public void checkValidReadOperation(String path) throws TFTPException {
 		
 		File theFile = new File(path);
 		
@@ -70,18 +71,16 @@ public class Client {
 			if (!theFile.canWrite()){
 				String msg = "cannot write to destination file";
 				logger.error(msg);
-				throw new AccessDeniedException(msg);
+				throw new TFTPException(msg, PacketUtil.ERR_ACCESS_VIOLATION);
 			}
 			
-			
-			
-			throw new FileAlreadyExistsException("destination file exists");			
+			throw new TFTPException("destination file exists", PacketUtil.ERR_FILE_EXISTS);
 
 		}
 		
 	}
 	
-	public void checkValidWriteOperation(String path) throws FileNotFoundException, AccessDeniedException, TFTPFileIOException {
+	public void checkValidWriteOperation(String path) throws TFTPException {
 		
 		File theFile = new File(path);
 		
@@ -89,13 +88,13 @@ public class Client {
 		if (!theFile.exists()){
 			String msg = "source file not found: " + path;
 			logger.error(msg);
-			throw new FileNotFoundException("source file does not exist");
+			throw new TFTPException(msg, PacketUtil.ERR_FILE_NOT_FOUND);
 		}
 		if (!theFile.canRead()){			
-			throw new AccessDeniedException("cannot read from source file");
+			throw new TFTPException("cannot read from source file", PacketUtil.ERR_ACCESS_VIOLATION);
 		}
 		if (theFile.length() > 33553920L){
-			throw new TFTPFileIOException("destination file exists", PacketUtil.ERR_UNDEFINED);
+			throw new TFTPFileIOException("source file is too big! (files >  33MB not supported)", PacketUtil.ERR_UNDEFINED);
 		}
 	}
 
@@ -143,7 +142,7 @@ public class Client {
 		return msg;
 	}	
 
-	public void sendReadRequest(String fullpath, String mode) throws IOException, TFTPPacketException, TFTPFileIOException {
+	public void sendReadRequest(String fullpath, String mode) throws TFTPException{
 		
 		String[] pathSegments = fullpath.split("\\"+File.separator);
 		String filename = pathSegments[pathSegments.length-1];
@@ -159,8 +158,7 @@ public class Client {
 		try {
 			sendPacket = new DatagramPacket(payload, payload.length, InetAddress.getLocalHost(), targetPort);
 		} catch (UnknownHostException e) {
-			e.printStackTrace();
-			System.exit(1);
+			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 		}
 
 		logger.logPacketInfo(sendPacket, true);
@@ -180,8 +178,7 @@ public class Client {
 			sendReceiveSocket.receive(receivePacket);
 			
 		} catch(IOException e) {
-			logger.error(e.getMessage());
-			System.exit(1);
+			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 		}
 		
 		// check if this is an error packet
@@ -192,20 +189,17 @@ public class Client {
         	parser.parseDataPacket(receivePacket, 1);
         }catch(ErrorReceivedException e){
         	logger.error(e.getMessage());
-            if(e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID){
-            	//request may sent to different port, so resend it
-            	sendReadRequest(fullpath, mode);
-            }
-            
-            if (e.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP ){
-            	//request may damaged, resend it
-            	sendReadRequest(fullpath, mode);
-            }
+            throw e;
         }catch(TFTPPacketException ex){
         	logger.error(ex.getMessage());
         	PacketUtil packetUtil = new PacketUtil(receivePacket.getAddress(),receivePacket.getPort());
         	DatagramPacket errPkt = packetUtil.formErrorPacket(ex.getErrorCode(), ex.getMessage());
-        	sendReceiveSocket.send(errPkt);
+        	try {
+				sendReceiveSocket.send(errPkt);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
         	if (ex.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP){
         		logger.error("File transfer can not start, terminating");
         	    return;
@@ -223,7 +217,7 @@ public class Client {
 		r.receiveFile(receivePacket, dirpath, filename);
 	}
 
-	public void sendWriteRequest(String fullpath, String mode) throws TFTPFileIOException{
+	public void sendWriteRequest(String fullpath, String mode) throws TFTPException {
 		
 		String[] pathSegments = fullpath.split("\\"+File.separator);
 		String filename = pathSegments[pathSegments.length-1];
@@ -262,7 +256,9 @@ public class Client {
 			e.printStackTrace();
 			System.exit(1);
 		}
+		
 		PacketParser parser = new PacketParser();
+		
 		try{
 		    parser.parseAckPacket(receivePacket, 0);
 		}catch(ErrorReceivedException e){
@@ -283,33 +279,27 @@ public class Client {
         	try{
         	    sendReceiveSocket.send(errPkt);
         	}catch(IOException ew){
-        		logger.error(ew.getMessage());
-        		System.exit(1);
+        		throw new TFTPException(ew.getMessage(), PacketUtil.ERR_UNDEFINED);
         	}
-        	if (ex.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP){
-        		logger.error("File transfer can not start, terminating");
-        	    return;
-        	}
+        	        	
+        	throw ex;
 		}catch(TFTPFileIOException exs){
         	logger.error(exs.getMessage());
         	throw exs;
 		}catch(TFTPException w){
         	logger.error(w.getMessage());
-        	return;
+        	throw w;
 		}
 		logger.logPacketInfo(receivePacket, false);
 
-		// TODO: verify ack packet
+		// set up a sender to proceed with the transfer
 
-
-		// assume our request is good, set up a sender to proceed with the transfer
-
-		Sender s = new Sender(sendReceiveSocket,receivePacket.getPort());
+		Sender s = new Sender(sendReceiveSocket, receivePacket.getPort());
 		try {
 			s.sendFile(new File(fullpath));
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		} catch (TFTPException e) {
+			System.out.println("ERROR CODE " + e.getErrorCode());
+			System.out.println(e.getMessage());
 		}
 	}
 

@@ -54,28 +54,30 @@ public class WriteHandlerThread extends WorkerThread {
 			filename = packetParser.parseWRQPacket(reqPacket);
 			
 		} catch (TFTPPacketException e) {
-			
+			e.printStackTrace();
 			logger.error(e.getMessage());
 			
 			// send error packet
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {			   
+			} catch (IOException ex) {			
+				ex.printStackTrace();
 				logger.error(ex.getMessage());
 				return;
 			}
 			return;
 			
 		} catch (TFTPFileIOException e) {
-			
+			e.printStackTrace();
 			logger.error(e.getMessage());
 			
 			// send error packet to client
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {			   
+			} catch (IOException ex) {		
+				ex.printStackTrace();
 				logger.error(ex.getMessage());
 				return;
 			}
@@ -83,7 +85,7 @@ public class WriteHandlerThread extends WorkerThread {
 			
 		} catch (ErrorReceivedException e) {
 			// the client sent an error packet, so in most cases don't send a response
-			
+			e.printStackTrace();
 			logger.error(e.getMessage());
 			
 			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
@@ -91,13 +93,15 @@ public class WriteHandlerThread extends WorkerThread {
 				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 				try {			   
 					sendReceiveSocket.send(errPacket);			   
-				} catch (IOException ex) {			   
+				} catch (IOException ex) {	
+					ex.printStackTrace();
 					logger.error(ex.getMessage());
 					return;
 				}
 			} else return;
 			
 		} catch (TFTPException e) {
+			e.printStackTrace();
 			// this block shouldn't get executed, but needs to be here to compile
 			logger.error(e.getMessage());
 		}
@@ -118,7 +122,7 @@ public class WriteHandlerThread extends WorkerThread {
 		String fullpath = Config.getServerDirectory() + filename;
 		
 		File f = new File(fullpath);
-		if(!f.canWrite()){    // no write access
+		if(f.exists() && !f.canWrite()){    // no write access
 
 			byte errorCode = 2;   //error code 2 : access violation
 			DatagramPacket error= OPcodeError.OPerror("ACCESS VIOLATION",errorCode);  //create error packet
@@ -189,8 +193,9 @@ public class WriteHandlerThread extends WorkerThread {
 		Receiver r = new Receiver(sendRecvSocket, receivePacket.getPort());
 		try {
 			r.receiveFile(receivePacket, Config.getServerDirectory(), filename);
-		} catch (IOException e) {
+		} catch (TFTPException e) {
 			logger.error(e.getMessage());
+			e.printStackTrace();
 		} finally {		
 			cleanup();
 		}

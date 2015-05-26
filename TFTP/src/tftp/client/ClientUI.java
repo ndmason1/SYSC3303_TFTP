@@ -13,9 +13,12 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
+import java.util.HashSet;
 import java.util.Scanner;
 
 import tftp.Logger;
+import tftp.exception.ErrorReceivedException;
+import tftp.exception.TFTPException;
 import tftp.exception.TFTPFileIOException;
 import tftp.exception.TFTPPacketException;
 
@@ -50,11 +53,11 @@ public class ClientUI {
 	
 	private void printHelp() {
 		System.out.println("Please enter your file transfer request in the following format:\n");
-		System.out.println("  <filename> <absolute path of file location> <request type> <transfer mode>\n");
+		System.out.println("  <absolute path of file location> <filename> <request type> <transfer mode>\n");
 		System.out.println("Acceptable request types: 'r' (read) or 'w' (write)");
 		System.out.println("Acceptable transfer modes: 'n' (netascii - text files) or 'o' (octet - binary files)");
 		System.out.println("Example request (both forward slash or backslash path separator accepted):\n");
-		System.out.println("  file.txt C:/Users/User/ r o\n");
+		System.out.println("  C:/Users/User/ file.txt r o\n");
 		System.out.println("Press Q at any time to quit.\n");
 	}
 	
@@ -84,7 +87,10 @@ public class ClientUI {
 		
 		String fullpath = path;
 		// make sure the last character in the path is a separator
-		if (path.charAt(path.length()-1) != File.separator.toCharArray()[0]) {			
+		HashSet<Character> separators = new HashSet<Character>();
+		separators.add('/');
+		separators.add('\\');
+		if ( !separators.contains(path.charAt(path.length()-1)) ) {			
 			fullpath += File.separator;
 		}
 		fullpath += filename;
@@ -94,29 +100,17 @@ public class ClientUI {
 			// check that the local (destination) file can be written to
 			try {
 				client.checkValidReadOperation(fullpath);
-			} catch (AccessDeniedException e) {				
-				System.out.println("Error: Access denied to destination file");				
-			} catch (FileAlreadyExistsException e) {
-				// file exists on the local filesystem, so make sure the user really wants to overwrite
-				while (true){					
-					System.out.println("Destination file on local filesystem already exists."); 
-					System.out.println("Do you want to replace it? (y/n)");
-					String userinput = keyboard.nextLine().toLowerCase();
-					if(userinput.equals("y")) {
-						new File(filename).delete();
-						break;
-					}
-					else if (userinput.equals("n")) {
-						System.out.println("Operation terminated.");
-						return;
-					}
-				}
+			} catch (TFTPException e) {
+				System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+				System.out.println(e.getMessage());
 			}
+			
+			// send the request
 			try {
-				client.sendReadRequest(fullpath, mode);
-			} catch (IOException e) {
-				System.out.println("Error: IOException caught, couldn't complete request");
-				e.printStackTrace();
+				client.sendReadRequest(fullpath, mode);	
+			} catch (ErrorReceivedException e) {
+				System.out.println("Error packet received from server!");
+				System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 				return;
 			} catch (TFTPFileIOException e) {
 				System.out.println("Error: File IO exception from server");
@@ -125,33 +119,45 @@ public class ClientUI {
 			} catch (TFTPPacketException e) {
 				System.out.println("Error: Bad packet received from server");
 				System.out.println(e.getMessage());
+				return;			
+			} catch (TFTPException e) {
+				e.printStackTrace();
+				System.out.println("Error code " + e.getErrorCode());
+				System.out.println(e.getMessage());
 				return;
 			}
-			System.out.printf("Transfer of file \"%s\" finished.\n\n", filename);
+			System.out.printf("Read of file \"%s\" into directory \"%s\" finished.\n\n", filename, path);
 			
 		} else if (type.equals("w")) {
 			// write request
 			// check that local (source) file exists and can be read from
 			try {
-				client.checkValidWriteOperation(fullpath);
-			} catch (AccessDeniedException e) {				
-				System.out.println("Error: Access denied to source file");
-				return;
-			} catch (FileNotFoundException e) {
-				System.out.println("Error: Source file not found");
+				client.checkValidWriteOperation(fullpath);			
+			} catch (ErrorReceivedException e) {
+				System.out.println("Error packet received from server!");
+				System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 				return;
 			} catch (TFTPFileIOException e) {
-				System.out.println("Error: Source file too big! (Files with size > 33MB not supported)");
+				System.out.println("Error: File IO exception from server");
+				System.out.println(e.getMessage());
+				return;
+			} catch (TFTPPacketException e) {
+				System.out.println("Error: Bad packet received from server");
+				System.out.println(e.getMessage());
+				return;			
+			} catch (TFTPException e) {
+				System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 				return;
 			}
+			
 			try{
 			    client.sendWriteRequest(fullpath, mode);
-			}catch (TFTPFileIOException e){
-				System.out.println(e.getMessage());
-				e.printStackTrace();
-				System.exit(1);
+			}catch (TFTPException e){
+				System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+				return;
 			}
-			System.out.printf("Transfer of file \"%s\" finished.\n\n", filename);
+			
+			System.out.printf("Write of file \"%s\" from directory \"%s\" finished.\n\n", filename, path);
 		} else {
 			System.out.println("Invalid request type.");
 			printHelp();

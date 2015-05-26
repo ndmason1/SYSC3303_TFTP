@@ -12,12 +12,14 @@ public class TFTPException extends Exception {
 	
 	protected int errCode;
 	
+	
 	public TFTPException() {
 		// TODO Auto-generated constructor stub
 	}
 
-	public TFTPException(String arg0, int errCode) {
-		super(errCode + arg0);
+	public TFTPException(String arg0, int errCode) {		
+		super(arg0);
+		this.errCode = errCode;
 		// TODO Auto-generated constructor stub
 	}
 
