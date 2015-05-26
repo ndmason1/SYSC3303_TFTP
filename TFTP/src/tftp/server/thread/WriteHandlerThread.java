@@ -15,7 +15,11 @@ import java.net.DatagramSocket;
 import java.net.SocketException;
 
 import tftp.Config;
+import tftp.exception.ErrorReceivedException;
 import tftp.exception.InvalidRequestException;
+import tftp.exception.TFTPException;
+import tftp.exception.TFTPFileIOException;
+import tftp.exception.TFTPPacketException;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
 
@@ -42,6 +46,63 @@ public class WriteHandlerThread extends WorkerThread {
 	public void run() {
 		byte[] data = reqPacket.getData();
 		
+		PacketUtil packetUtil = new PacketUtil(reqPacket.getAddress(), reqPacket.getPort());
+		String filename = null;
+		
+		// parse the request packet to ensure it is correct before starting the transfer
+		try {
+			filename = packetParser.parseWRQPacket(reqPacket);
+			
+		} catch (TFTPPacketException e) {
+			
+			logger.error(e.getMessage());
+			
+			// send error packet
+			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+			try {			   
+				sendReceiveSocket.send(errPacket);			   
+			} catch (IOException ex) {			   
+				logger.error(ex.getMessage());
+				return;
+			}
+			return;
+			
+		} catch (TFTPFileIOException e) {
+			
+			logger.error(e.getMessage());
+			
+			// send error packet to client
+			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+			try {			   
+				sendReceiveSocket.send(errPacket);			   
+			} catch (IOException ex) {			   
+				logger.error(ex.getMessage());
+				return;
+			}
+			return;
+			
+		} catch (ErrorReceivedException e) {
+			// the client sent an error packet, so in most cases don't send a response
+			
+			logger.error(e.getMessage());
+			
+			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+				// send error packet to the unknown TID
+				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				try {			   
+					sendReceiveSocket.send(errPacket);			   
+				} catch (IOException ex) {			   
+					logger.error(ex.getMessage());
+					return;
+				}
+			} else return;
+			
+		} catch (TFTPException e) {
+			// this block shouldn't get executed, but needs to be here to compile
+			logger.error(e.getMessage());
+		}
+				
+			
 		// validate file name		
 		int i = 2;
 		StringBuilder sb = new StringBuilder();
@@ -53,7 +114,7 @@ public class WriteHandlerThread extends WorkerThread {
 						String.format("non-printable data inside file name: byte %d",i));			
 			i++;
 		}
-		String filename = sb.toString();
+		
 		String fullpath = Config.getServerDirectory() + filename;
 		
 		File f = new File(fullpath);
@@ -101,7 +162,7 @@ public class WriteHandlerThread extends WorkerThread {
 			System.exit(1);
 		}
 		
-		PacketUtil packetUtil = new PacketUtil(reqPacket.getAddress(), reqPacket.getPort());
+		
 		DatagramPacket initAck = packetUtil.formAckPacket(0);
 		
 		logger.logPacketInfo(initAck, true);
@@ -110,6 +171,7 @@ public class WriteHandlerThread extends WorkerThread {
 			sendRecvSocket.send(initAck);
 		} catch (IOException e) {
 			// TODO Auto-generated catch block
+			logger.error(e.getMessage());
 			e.printStackTrace();
 		}
 		
