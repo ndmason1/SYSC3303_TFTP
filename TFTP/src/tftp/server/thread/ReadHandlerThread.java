@@ -44,6 +44,9 @@ public class ReadHandlerThread extends WorkerThread {
 	 */
 	@Override
 	public void run() {
+		
+		System.out.println("Started read handler thread");
+		
 		byte[] data = reqPacket.getData();
 		PacketUtil packetUtil = new PacketUtil(reqPacket.getAddress(), reqPacket.getPort());
 		String filename = null;

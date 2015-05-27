@@ -78,13 +78,14 @@ public class Server {
 			// wait for request to come  in
 			try {
 				receiveSocket.receive(receivePacket);
+				
 			} catch (IOException e) {
 				logger.error("IO Exception: likely:");
 				logger.error("Receive Socket Timed Out.\n" + e);
 				e.printStackTrace();
 				System.exit(1);
 			}			
-			
+			System.out.println("received packet on port 69");
 			logger.logPacketInfo(receivePacket, false);
 			logger.info(String.format("Request received. Creating handler thread %d", threadCount));
 			// spawn a thread to process request

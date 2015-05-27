@@ -40,7 +40,12 @@ public class ErrorSimulator {
 	
 	public ErrorSimulator()
 	{
-		try {sendReceieveSocket = new DatagramSocket(ErrorSimPort);} catch (SocketException se) {se.printStackTrace();System.exit(1); }
+		try {
+			sendReceieveSocket = new DatagramSocket(ErrorSimPort);
+		} catch (SocketException se) {
+			se.printStackTrace();
+			System.exit(1); 
+		}
 	}
 	
 	
@@ -86,7 +91,7 @@ public class ErrorSimulator {
 				packetError(scanner);
 				break;
 			} else if(input==5) {
-				System.out.println("TIP Error!");
+				System.out.println("TID Error!");
 				TIDError(scanner);
 				break;
 			} else if(input>=8 && input<=10) {
@@ -100,7 +105,7 @@ public class ErrorSimulator {
 	}
 	
 	private void TIDError(Scanner scanner) {
-		System.out.println("TIP Error:");
+		System.out.println("TID Error:");
 		System.out.println();
 		System.out.println("Packet type to initiate error:");
 		System.out.println("1) DATA");
@@ -218,6 +223,10 @@ public class ErrorSimulator {
 		error = new Error(PACKET, this.packetType, new Message(this.blockNumber),this.errorDetail);
 	}
 	
+	public DatagramSocket getClientFacingSocket() {
+		return sendReceieveSocket;
+	}
+	
 
 	
 	
@@ -233,7 +242,7 @@ public class ErrorSimulator {
 			s.setupErrorMode(scanner);
 			ErrorSimCreator thread = null;
 			try {
-				thread = new ErrorSimCreator(s.FormPacket(),s.error);
+				thread = new ErrorSimCreator(s.getClientFacingSocket(), s.FormPacket(),s.error);
 			} catch (java.rmi.UnknownHostException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();

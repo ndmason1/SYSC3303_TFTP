@@ -21,6 +21,7 @@ import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
 import tftp.exception.TFTPFileIOException;
 import tftp.exception.TFTPPacketException;
+import tftp.net.PacketUtil;
 
 public class ClientUI {
 
@@ -101,8 +102,28 @@ public class ClientUI {
 			try {
 				client.checkValidReadOperation(fullpath);
 			} catch (TFTPException e) {
-				System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
-				System.out.println(e.getMessage());
+				
+				if (e.getErrorCode() == PacketUtil.ERR_FILE_EXISTS) {					
+					// file exists on the local filesystem, so make sure the user really wants to overwrite
+					
+					while (true){					
+						System.out.println("Destination file on local filesystem already exists."); 
+						System.out.println("Do you want to replace it? (y/n)");
+						String userinput = keyboard.nextLine().toLowerCase();
+						if(userinput.equals("y")) {
+							new File(filename).delete();
+							break;
+						}
+						else if (userinput.equals("n")) {
+							System.out.println("Operation terminated.");
+							return;
+						}
+					}
+					
+				} else {					
+					System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+					System.out.println(e.getMessage());
+				}
 			}
 			
 			// send the request

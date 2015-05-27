@@ -29,7 +29,7 @@ public class ErrorSimCreator  implements Runnable
 	private DatagramPacket ReceivePacket, SendPacket;
 	
 	
-	private DatagramSocket sendReceieveSocket;
+	private DatagramSocket sendReceieveSocket, clientSocket;
 	private boolean exitNext;
 	private int clientPort,serverPort;
 	private InetAddress clientIP, serverIP;
@@ -45,9 +45,9 @@ public class ErrorSimCreator  implements Runnable
 
 	private int errorMsg;
 	
-	public ErrorSimCreator( DatagramPacket dp, Error e ) throws UnknownHostException, java.rmi.UnknownHostException {
+	public ErrorSimCreator( DatagramSocket clientSocket, DatagramPacket dp, Error e ) throws UnknownHostException, java.rmi.UnknownHostException {
 
-		
+		this.clientSocket = clientSocket;
 		
 	    ReceivePacket = dp;
 	    serverPort = 69;
@@ -165,46 +165,47 @@ public class ErrorSimCreator  implements Runnable
 			for(int i = 0; i < temp.length; i++) System.out.print(temp[i]+" ");
 			System.out.println();
 
-			SendPacket = new DatagramPacket(temp,temp.length,serverIP,serverPort);
+			//SendPacket = new DatagramPacket(temp,temp.length,serverIP,serverPort);
+			SendPacket = new DatagramPacket(temp,ReceivePacket.getLength(),serverIP,serverPort);
 			System.out.println("Recieved Packet from client");
 			sendReceieveSocket = new DatagramSocket();
 
 			sendReceieveSocket.send(SendPacket);
 			System.out.println("Forwarded packet to server");
 			
-			
-			
-			if(checkLast(SendPacket.getData()))
-			{
-				System.out.println("Which type of error do you wish to generate? (select by number):");
-				System.out.println("0) No Error");
-				System.out.println("4) Packet Error");
-				System.out.println("5) TID Error");
-				System.out.println("8) Delayed Packet");
-				System.out.println("9) Deleted Packet");
-				System.out.println("10) Duplicated Packet");
-				System.out.println("Choose: ");
-				return;
-			}
-			
-
-			for(;;) {
-
-
-				{
-					System.out.println("Which type of error do you wish to generate? (select by number):");
-					System.out.println("0) No Error");
-					System.out.println("4) Packet Error");
-					System.out.println("5) TID Error");
-					System.out.println("8) Delayed Packet");
-					System.out.println("9) Deleted Packet");
-					System.out.println("10) Duplicated Packet");
-					System.out.println("Choose: ");
-					return;
-				}
-			}
-			
-			
+			// get server response and pass to client
+//			
+//			if(checkLast(SendPacket.getData()))
+//			{
+//				System.out.println("Which type of error do you wish to generate? (select by number):");
+//				System.out.println("0) No Error");
+//				System.out.println("4) Packet Error");
+//				System.out.println("5) TID Error");
+//				System.out.println("8) Delayed Packet");
+//				System.out.println("9) Deleted Packet");
+//				System.out.println("10) Duplicated Packet");
+//				System.out.println("Choose: ");
+//				return;
+//			}
+//			
+//
+//			for(;;) {
+//
+//
+//				{
+//					System.out.println("Which type of error do you wish to generate? (select by number):");
+//					System.out.println("0) No Error");
+//					System.out.println("4) Packet Error");
+//					System.out.println("5) TID Error");
+//					System.out.println("8) Delayed Packet");
+//					System.out.println("9) Deleted Packet");
+//					System.out.println("10) Duplicated Packet");
+//					System.out.println("Choose: ");
+//					return;
+//				}
+//			}
+//			
+//			
 			
 		} catch (SocketException e) {
 			e.printStackTrace();
@@ -406,6 +407,10 @@ public class ErrorSimCreator  implements Runnable
 				//recieves error and closes port
 				fakePort.receive(temp = new DatagramPacket(new byte[Buffer],Buffer));
 				fakePort.close();
+				
+				
+				clientSocket.send(new DatagramPacket(temp.getData(), temp.getLength(), clientIP, clientPort));
+				
 				// makes sure TID error is formatted properly
 				if(temp.getData()[0]==0 && temp.getData()[1]==5 && temp.getData()[2]==0 && temp.getData()[3]==5) {
 					int i;
@@ -476,4 +481,6 @@ public class ErrorSimCreator  implements Runnable
 		}
 		return packet.getData();
 	}
+	
+	
 }
