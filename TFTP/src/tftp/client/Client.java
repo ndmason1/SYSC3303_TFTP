@@ -40,7 +40,7 @@ public class Client {
 
 	private DatagramSocket sendReceiveSocket;
 	private DatagramPacket sendPacket, receivePacket;
-	private Logger logger;
+	//private Logger logger;
 	private int targetPort;
 	
 	public Client() {
@@ -53,7 +53,7 @@ public class Client {
 		
 		targetPort = Config.getSimulateErrors() ? 68 : 69;
 
-		logger = Logger.getInstance();				
+		//logger = Logger.getInstance();				
 	}
 
 	public void cleanup() {
@@ -70,7 +70,8 @@ public class Client {
 			//Checking if user can read the file
 			if (!theFile.canWrite()){
 				String msg = "cannot write to destination file";
-				logger.error(msg);
+				//logger.error(msg);
+				System.out.println(msg);
 				throw new TFTPException(msg, PacketUtil.ERR_ACCESS_VIOLATION);
 			}
 			
@@ -87,7 +88,8 @@ public class Client {
 		//Checking if the file exists
 		if (!theFile.exists()){
 			String msg = "source file not found: " + path;
-			logger.error(msg);
+			//logger.error(msg);
+			System.out.println(msg);
 			throw new TFTPException(msg, PacketUtil.ERR_FILE_NOT_FOUND);
 		}
 		if (!theFile.canRead()){			
@@ -148,9 +150,10 @@ public class Client {
 		String filename = pathSegments[pathSegments.length-1];
 		String dirpath = fullpath.substring(0, fullpath.length() - filename.length());
 		
-		logger.debug("path name is " + dirpath);
+		//logger.debug("path name is " + dirpath);
+		System.out.println("path name is " + dirpath);
 
-		logger.info(String.format("Starting read of file %s from server...", filename));
+		System.out.println(String.format("Starting read of file %s from server...", filename));
 
 		byte[] payload = prepareReadRequestPayload(filename, mode);		
 
@@ -161,7 +164,7 @@ public class Client {
 			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 		}
 
-		logger.logPacketInfo(sendPacket, true);
+		//logger.logPacketInfo(sendPacket, true);
 
 
 		try {
@@ -188,10 +191,12 @@ public class Client {
         	//receive first data packet with block #1
         	parser.parseDataPacket(receivePacket, 1);
         }catch(ErrorReceivedException e){
-        	logger.error(e.getMessage());
+        	//logger.error(e.getMessage());
+        	System.out.println(e.getMessage());
             throw e;
         }catch(TFTPPacketException ex){
-        	logger.error(ex.getMessage());
+        	//logger.error(ex.getMessage());
+        	System.out.println(ex.getMessage());
         	PacketUtil packetUtil = new PacketUtil(receivePacket.getAddress(),receivePacket.getPort());
         	DatagramPacket errPkt = packetUtil.formErrorPacket(ex.getErrorCode(), ex.getMessage());
         	try {
@@ -201,14 +206,17 @@ public class Client {
 				e.printStackTrace();
 			}
         	if (ex.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP){
-        		logger.error("File transfer can not start, terminating");
+        		//logger.error("File transfer can not start, terminating");
+        		System.out.println("File transfer can not start, terminating");
         	    return;
         	}
         }catch(TFTPFileIOException exs){
-        	logger.error(exs.getMessage());
+        	//logger.error(exs.getMessage());
+        	System.out.println(exs.getMessage());
         	throw exs;
         }catch(TFTPException w){
-        	logger.error(w.getMessage());
+        	//logger.error(w.getMessage());
+        	System.out.println(w.getMessage());
         	return;
         }
         
@@ -222,8 +230,8 @@ public class Client {
 		String[] pathSegments = fullpath.split("\\"+File.separator);
 		String filename = pathSegments[pathSegments.length-1];
 		
-		logger.info(String.format("Starting write of file %s from server...", filename));
-
+		//logger.info(String.format("Starting write of file %s from server...", filename));
+		System.out.println(String.format("Starting write of file %s from server...", filename));
 		byte[] payload = prepareWriteRequestPayload(filename, mode);
 
 		// create send packet
@@ -234,7 +242,7 @@ public class Client {
 			System.exit(1);
 		}
 
-		logger.logPacketInfo(sendPacket, true);
+		//logger.logPacketInfo(sendPacket, true);
 
 		// send packet to server
 		try {
@@ -262,7 +270,8 @@ public class Client {
 		try{
 		    parser.parseAckPacket(receivePacket, 0);
 		}catch(ErrorReceivedException e){
-			logger.error(e.getMessage());
+			//logger.error(e.getMessage());
+			System.out.println(e.getMessage());
             if(e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID){
             	//request may sent to different port, so resend it
             	sendWriteRequest(fullpath, mode);
@@ -273,7 +282,8 @@ public class Client {
             	sendWriteRequest(fullpath, mode);
             }
 		}catch(TFTPPacketException ex){
-			logger.error(ex.getMessage());
+			//logger.error(ex.getMessage());
+			System.out.println(ex.getMessage());
 			PacketUtil packetUtil = new PacketUtil(receivePacket.getAddress(),receivePacket.getPort());
         	DatagramPacket errPkt = packetUtil.formErrorPacket(ex.getErrorCode(), ex.getMessage());
         	try{
@@ -284,13 +294,15 @@ public class Client {
         	        	
         	throw ex;
 		}catch(TFTPFileIOException exs){
-        	logger.error(exs.getMessage());
+        	//logger.error(exs.getMessage());
+        	System.out.println(exs.getMessage());
         	throw exs;
 		}catch(TFTPException w){
-        	logger.error(w.getMessage());
+        	//logger.error(w.getMessage());
+        	System.out.println(w.getMessage());
         	throw w;
 		}
-		logger.logPacketInfo(receivePacket, false);
+		//logger.logPacketInfo(receivePacket, false);
 
 		// set up a sender to proceed with the transfer
 
