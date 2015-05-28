@@ -13,8 +13,6 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
 
-import tftp.Config;
-import tftp.Logger;
 import tftp.net.PacketParser;
 
 public abstract class WorkerThread extends Thread {
@@ -48,12 +46,7 @@ public abstract class WorkerThread extends Thread {
 	 * Port number of the client process.
 	 */
 	protected int clientPort;
-	
-	/**
-	 * Logger object used for logging debug/error messages.
-	 */
-	protected Logger logger;
-	
+
 	protected PacketParser packetParser;
 	
 	/**
@@ -73,7 +66,6 @@ public abstract class WorkerThread extends Thread {
 			e.printStackTrace();
 		}
 		
-		logger = Logger.getInstance();
 		packetParser = new PacketParser(reqPacket.getAddress(), reqPacket.getPort());
 	}
 	

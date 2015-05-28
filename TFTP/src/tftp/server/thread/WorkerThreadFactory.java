@@ -11,7 +11,6 @@ package tftp.server.thread;
 
 import java.net.DatagramPacket;
 
-import tftp.Config;
 import tftp.exception.TFTPPacketException;
 import tftp.net.PacketUtil;
 

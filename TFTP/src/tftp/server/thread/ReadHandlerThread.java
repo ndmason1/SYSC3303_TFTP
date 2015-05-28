@@ -14,7 +14,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
 
-import tftp.Config;
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.InvalidRequestException;
 import tftp.exception.TFTPException;
@@ -27,13 +26,15 @@ import tftp.net.Sender;
  * A specialized thread that processes TFTP read requests received by a TFTP server.
  */
 public class ReadHandlerThread extends WorkerThread {	
-
+	
 	/**
 	 * Constructs a ReadHandlerThread. Passes the DatagramPacket argument to 
 	 * the WorkerThread constructor. 
 	 *
 	 * @param  reqPacket  the packet containing the client's request
 	 */
+	private String directory; 
+	
 	public ReadHandlerThread(DatagramPacket reqPacket) {
 		super(reqPacket);
 	}	
@@ -47,53 +48,41 @@ public class ReadHandlerThread extends WorkerThread {
 		byte[] data = reqPacket.getData();
 		PacketUtil packetUtil = new PacketUtil(reqPacket.getAddress(), reqPacket.getPort());
 		String filename = null;
-
+		
 		// parse the request packet to ensure it is correct before starting the transfer
 		try {
 			filename = packetParser.parseRRQPacket(reqPacket);
-
+			
 		} catch (TFTPPacketException e) {
 			e.printStackTrace();
-			System.out.println("Sending Read Request to for the file" + filename);
-			System.out.println("Sending Read Request with Opcode" + reqPacket.getData()[0] + reqPacket.getData()[1]);
-			System.out.println("Sending Read Request to the Port" + reqPacket.getPort());
-			System.out.println("Sending Read Request to an Ip address" + reqPacket.getAddress());
-
-
-
-			logger.error(e.getMessage());
-
+			
 			// send error packet
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
 			} catch (IOException ex) {			
 				ex.printStackTrace();
-				logger.error(ex.getMessage());
 				return;
 			}
 			return;
-
+			
 		} catch (TFTPFileIOException e) {
 			e.printStackTrace();
-			logger.error(e.getMessage());
-
+			
 			// send error packet to client
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
 			} catch (IOException ex) {	
 				ex.printStackTrace();
-				logger.error(ex.getMessage());
 				return;
 			}
 			return;
-
+			
 		} catch (ErrorReceivedException e) {
 			// the client sent an error packet, so in most cases don't send a response
 			e.printStackTrace();
-			logger.error(e.getMessage());
-
+			
 			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
 				// send error packet to the unknown TID
 				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
@@ -101,23 +90,27 @@ public class ReadHandlerThread extends WorkerThread {
 					sendReceiveSocket.send(errPacket);			   
 				} catch (IOException ex) {	
 					ex.printStackTrace();
-					logger.error(ex.getMessage());
 					return;
 				}
 			} else return;
-
+			
 		} catch (TFTPException e) {
 			e.printStackTrace();
 			// this block shouldn't get executed, but needs to be here to compile
-			logger.error(e.getMessage());
 		}
-
-		String fullpath = Config.getServerDirectory() + filename;
-
+		
+		try {
+			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\server\\ServerFiles")));
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	
 		//\\//\\//\\ File Not Found - Error Code 1 //\\//\\//\\
 
 		//Opens an input stream
-		File f = new File(fullpath);
+		File f = new File(getDirectory().concat("\\" + filename));
+		
 		if(!f.exists()){    //file doesn't exist
 
 			byte errorCode = PacketUtil.ERR_FILE_NOT_FOUND;   //error code 1 : file not found
@@ -129,17 +122,11 @@ public class ReadHandlerThread extends WorkerThread {
 				sendReceiveSocket.send(error);
 			} catch (IOException ex) {				
 				ex.printStackTrace();
-			}			 
-
-			System.out.println("Sent error-File Doesn't Exists, Error Code:" + errorCode);
-			System.out.println("Sent error for File" + filename);
-			System.out.println("with an opCode of: " + error.getData()[0] + error.getData()[1]);
-			System.out.println("to the port" + error.getPort());
-			System.out.println("With packet length of:" + error.getLength());
+			}			   
 			sendReceiveSocket.close();			   
 			return;
 		}
-
+		
 		if(!f.canRead()){    // no read access
 
 			byte errorCode = PacketUtil.ERR_ACCESS_VIOLATION;   //error code 2 : access violation
@@ -155,20 +142,26 @@ public class ReadHandlerThread extends WorkerThread {
 			sendReceiveSocket.close();			   
 			return;
 		}
-
+		
 		// request is good if we made it here
 		// read request, so start a file transfer
 		Sender s = new Sender(sendReceiveSocket, clientPort);
 		try {			
-			s.sendFile(new File(fullpath));
+			s.sendFile(f);
 		} catch (TFTPException e) {
 			e.printStackTrace();
 			System.out.println("ERROR CODE " + e.getErrorCode());
 			System.out.println(e.getMessage());
 		}
-
+		
 		cleanup();
 
 	}
+
+	//get functions
+	public String getDirectory(){return directory;}
+	
+	//set functions
+	public void setDirectory(String aDirectory){directory = aDirectory;}
 
 }

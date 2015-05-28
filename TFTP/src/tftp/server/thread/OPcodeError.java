@@ -10,8 +10,6 @@ package tftp.server.thread;
 
 import java.net.DatagramPacket;
 
-import tftp.Logger;
-
 public class OPcodeError {
 	private static byte[] OpcodeErr(byte[] data, byte[] msg, byte errorCode){
 		// opcode
@@ -33,7 +31,6 @@ public class OPcodeError {
 		byte[] data = new byte[msg.length + 5];            
 		data = OpcodeErr(data, msg, num);
 		DatagramPacket packet = new DatagramPacket(data, data.length);		
-		Logger.getInstance().error(errorMsg);
 		return packet;
 	}
 
