@@ -21,7 +21,7 @@ import java.util.Set;
 import tftp.exception.InvalidRequestException;
 import tftp.exception.TFTPPacketException;
 import tftp.Config;
-import tftp.Logger;
+//import tftp.Logger;
 import tftp.Util;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
@@ -40,7 +40,7 @@ public class Server {
 	
 	private WorkerThreadFactory threadFactory;
 	private HashSet<WorkerThread> activatedThreads;
-	private Logger logger;
+	//private Logger logger;
 	private boolean acceptNewConnections;
 	private int threadCount;
 	private String mainDirectory;	
@@ -55,16 +55,21 @@ public class Server {
 		}
 		
 		threadFactory = new WorkerThreadFactory();		
-		logger = Logger.getInstance();
+		//logger = Logger.getInstance();
 		
 		activatedThreads = new HashSet<WorkerThread>();
 		acceptNewConnections = true;
 		threadCount = 0;
-		mainDirectory = Config.getServerDirectory();
+		File f = new File(System.getProperty("user.home") + "\\Desktop\\Server");
+        boolean mkdir = f.mkdir();
+        if (mkdir != true){
+        	System.out.println("File already exists or other error, Can not create specific Server folder");
+        }
+		mainDirectory = System.getProperty("user.home") + "\\Desktop\\Server";
 	}
 
 	public void cleanup() {
-		logger.flushMessages();
+		//logger.flushMessages();
 		receiveSocket.close();
 	}
 
@@ -79,14 +84,17 @@ public class Server {
 			try {
 				receiveSocket.receive(receivePacket);
 			} catch (IOException e) {
-				logger.error("IO Exception: likely:");
-				logger.error("Receive Socket Timed Out.\n" + e);
+			//	logger.error("IO Exception: likely:");
+				//logger.error("Receive Socket Timed Out.\n" + e);
+				System.out.println("IO Exception: likely:");
+				System.out.println("Receive Socket Timed Out.\n" + e);
 				e.printStackTrace();
 				System.exit(1);
 			}			
 			
-			logger.logPacketInfo(receivePacket, false);
-			logger.info(String.format("Request received. Creating handler thread %d", threadCount));
+			//logger.logPacketInfo(receivePacket, false);
+			//logger.info(String.format("Request received. Creating handler thread %d", threadCount));
+			System.out.println(String.format("Request received. Creating handler thread %d", threadCount));
 			// spawn a thread to process request
 			WorkerThread worker = null;
 			try {
