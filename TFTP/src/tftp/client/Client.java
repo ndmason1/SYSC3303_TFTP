@@ -54,8 +54,6 @@ public class Client {
 			System.exit(1);
 		}
 		
-		targetPort = 69;
-		
 		try {
 			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\client\\ClientFiles")));
 		} catch (IOException e) {
@@ -73,7 +71,6 @@ public class Client {
 			System.exit(1);
 		}
 		
-		targetPort = 69;
 		setFilename(file);
 		setMode(aMode);
 			
