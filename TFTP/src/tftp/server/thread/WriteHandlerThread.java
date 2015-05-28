@@ -204,7 +204,7 @@ public class WriteHandlerThread extends WorkerThread {
 		Receiver r = new Receiver(sendRecvSocket, receivePacket.getPort());
 		try {
 			r.receiveFile(receivePacket, Config.getServerDirectory(), filename);
-		} catch (IOException e) {
+		} catch (TFTPException e) {
 			logger.error(e.getMessage());
 		} finally {		
 			cleanup();
