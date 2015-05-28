@@ -41,9 +41,13 @@ public class ClientUI {
 			System.out.println("Error Simulator on? yes/no?");
 			String errorSimulator = keyboard.nextLine();
 		
-			if (errorSimulator.toLowerCase().equals("yes") || errorSimulator.toLowerCase().equals("no")
-					|| errorSimulator.toLowerCase().equals("y") || errorSimulator.toLowerCase().equals("n"))
+			if (errorSimulator.toLowerCase().equals("yes") || errorSimulator.toLowerCase().equals("y"))
 			{
+				client.setPortNum(68);
+				check = false;
+			}
+			if (errorSimulator.toLowerCase().equals("no") || errorSimulator.toLowerCase().equals("n")){
+				client.setPortNum(69);
 				check = false;
 			}
 		}
