@@ -255,6 +255,9 @@ public class PacketParser {
 	 * @throws 			TFTPPacketException if the packet's TID is not known 
 	 */
 	private void checkTID(DatagramPacket packet) throws TFTPPacketException {
+		
+		System.out.println("checking TID");
+		
 		if (expectedIP != null && !packet.getAddress().equals(expectedIP)) 
 			throw new TFTPPacketException("unrecognized source IP address", PacketUtil.ERR_UNKNOWN_TID);
 		if (expectedPort != 0 && packet.getPort() != expectedPort) 

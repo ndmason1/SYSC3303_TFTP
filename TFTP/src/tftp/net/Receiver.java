@@ -13,7 +13,10 @@ import java.net.*;
 import java.util.*;
 import java.io.File;
 
+import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
+import tftp.exception.TFTPFileIOException;
+import tftp.exception.TFTPPacketException;
 import tftp.server.thread.OPcodeError;
 
 public class Receiver
@@ -23,8 +26,9 @@ public class Receiver
 	private InetAddress senderIP;
 	private PacketUtil packetUtil;
 	static String filename; 			//name of the file
+	private PacketParser packetParser;
 
-	public Receiver(DatagramSocket socket, int senderTID){		
+	public Receiver(DatagramSocket socket, int senderPort){		
 
 		try {
 			senderIP = InetAddress.getLocalHost();
@@ -34,11 +38,17 @@ public class Receiver
 		}
 
 		this.socket = socket;		
-		packetUtil = new PacketUtil(senderIP, senderTID);
+		packetUtil = new PacketUtil(senderIP, senderPort);
+		packetParser = new PacketParser(senderIP, senderPort);
+		
 	}
 
 	public void receiveFile(DatagramPacket initPacket, File aFile) throws TFTPException {
-
+		System.out.println("RECEIVER: top of receiveFile()");
+		
+		// parse the first DATA packet and see if we even need to set up 
+		
+		
 		File theFile = aFile;
 		FileOutputStream fileWriter = null;
 		try { // outer try with finally block so fileWriter gets closed
@@ -73,7 +83,8 @@ public class Receiver
 			data = new byte[PacketUtil.BUF_SIZE];
 			DatagramPacket receivePacket = new DatagramPacket(data, data.length);
 
-			int blockNum = packetUtil.parseDataPacket(initPacket);
+			int blockNum = 1;
+			packetParser.parseDataPacket(initPacket, blockNum);
 
 			// send ACK for initial data packet
 			DatagramPacket sendPacket = packetUtil.formAckPacket(blockNum);
@@ -95,6 +106,60 @@ public class Receiver
 				} catch(IOException ex) {
 					ex.printStackTrace();
 					System.exit(1);
+				}
+				
+				// increment block number so we can check if received packet has expected block number
+				blockNum++;
+				
+				// parse the response packet to ensure it is correct before continuing
+				try {
+					System.out.println("RECEIVER: about to parse DATA packet with block number " + blockNum);
+					packetParser.parseDataPacket(receivePacket, blockNum);
+
+				} catch (TFTPPacketException e) {
+					e.printStackTrace();
+
+					// send error packet
+					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+					try {			   
+						socket.send(errPacket);			   
+					} catch (IOException ex) {			
+						ex.printStackTrace();
+						return;
+					}
+					return;
+
+				} catch (TFTPFileIOException e) {
+					e.printStackTrace();
+
+					// send error packet to client
+					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+					try {			   
+						socket.send(errPacket);			   
+					} catch (IOException ex) {		
+						ex.printStackTrace();
+						return;
+					}
+					return;
+
+				} catch (ErrorReceivedException e) {
+					// the client sent an error packet, so in most cases don't send a response
+					e.printStackTrace();
+
+					if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+						// send error packet to the unknown TID
+						DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+						try {			   
+							socket.send(errPacket);			   
+						} catch (IOException ex) {	
+							ex.printStackTrace();
+							return;
+						}
+					} else return;
+
+				} catch (TFTPException e) {
+					e.printStackTrace();
+					// this block shouldn't get executed, but needs to be here to compile
 				}
 
 				//Check if the disk is already full, If full generate Error code-3

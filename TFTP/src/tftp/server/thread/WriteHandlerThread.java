@@ -36,6 +36,7 @@ public class WriteHandlerThread extends WorkerThread {
 	 */
 	public WriteHandlerThread(DatagramPacket reqPacket) {
 		super(reqPacket);
+		System.out.println("write handler thread");
 	}
 	
 	/**
@@ -165,7 +166,7 @@ public class WriteHandlerThread extends WorkerThread {
 			System.exit(1);
 		}
 		
-		
+		System.out.println("seding ACK 0");
 		DatagramPacket initAck = packetUtil.formAckPacket(0);
 				
 		try {
@@ -186,6 +187,7 @@ public class WriteHandlerThread extends WorkerThread {
 			
 		Receiver r = new Receiver(sendRecvSocket, receivePacket.getPort());
 		try {
+			System.out.println("calling receiver.receiveFile()");
 			r.receiveFile(receivePacket, f);
 		} catch (TFTPException e) {
 			e.printStackTrace();
