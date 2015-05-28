@@ -55,17 +55,18 @@ public class Sender {
 		} catch (FileNotFoundException e) {
 			throw new TFTPException(e.getMessage(), PacketUtil.ERR_FILE_NOT_FOUND);
 		}
-		
+
 		try {
 			fileLength = fileReader.available();
 		} catch (IOException e) {
 			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 		}
-		
+
 		int blockNum = 1;
 
 		logger.debug("*** Filename: " + theFile.getName() + " ***");
-		logger.debug("*** Bytes to send: " + fileLength + " ***");
+		//logger.debug("*** Bytes to send: " + fileLength + " ***");
+		System.out.println("Bytes to send:" + fileLength + "***");
 
 		byte[] sendBuf = new byte[512]; // need to make this exactly our block size so we only read that much
 		byte[] recvBuf = new byte[PacketUtil.BUF_SIZE];
@@ -93,20 +94,40 @@ public class Sender {
 				socket.send(sendPacket);
 			} catch (IOException e) {
 				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+
 			}
+
+			System.out.println("Sending  Packet for following file" + theFile.getName());
+			System.out.println( "Sending packet to port" + sendPacket.getPort() );
+			System.out.println("With block number" + blockNum);
+			System.out.println("Sent to Ip Address: "+ sendPacket.getAddress());
+			System.out.println("Sent with packet length of" + sendPacket.getLength());
+			System.out.println("With an opcode of: " + sendPacket.getData());
+
+
 			logger.logPacketInfo(sendPacket, true);
 
 			DatagramPacket reply = new DatagramPacket(recvBuf, recvBuf.length);
 
 			// expect an ACK from the other side
-		
+
 			logger.debug(String.format("waiting for ACK %d", blockNum));
+			System.out.println("Waiting for ACK" + blockNum);
 			try {
 				socket.receive(reply);
 			} catch (IOException e) {
 				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}                
 			logger.logPacketInfo(reply, false);
+
+			//Output after receiving ACK packet 
+			System.out.println("Recieved Ack Packet with Opcode" + reply.getData()[0]+ reply.getData()[4]);
+			System.out.println("Recieved Ack Packet from" + reply.getPort());
+			System.out.println("Recieved Ack Packet from IP" + reply.getAddress());
+			System.out.println("Recieved Ack Packet with block number" + blockNum);
+			System.out.println("Received Ack for the following file" + theFile.getName());
+			System.out.println("Recieved Ack with length of" + reply.getLength());
+
 
 			// parse ACK to ensure it is correct before continuing
 			try {
@@ -118,7 +139,7 @@ public class Sender {
 
 				// send error packet
 				DatagramPacket errPacket = null;
-				
+
 				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
 					// address packet to the unknown TID
 					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
@@ -127,7 +148,7 @@ public class Sender {
 					// packet will be addressed to recipient as usual					
 					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 				}
-				
+
 				try {			   
 					socket.send(errPacket);			   
 				} catch (IOException ex) {			   
@@ -147,9 +168,16 @@ public class Sender {
 					socket.send(errPacket);			   
 				} catch (IOException ex) {			   
 					logger.error(ex.getMessage());
+					System.out.println("Sending Error Code" + e.getErrorCode());
 					return;
 				}
-				
+				System.out.println("Sending Error Packet for following file" + theFile.getName());
+				System.out.println( "Sending Error packet to port" + errPacket.getPort() );
+				System.out.println("With block number" + blockNum);
+				System.out.println("Sent to Ip Address: "+ errPacket.getAddress());
+				System.out.println("Sent with packet length of" + errPacket.getLength());
+				System.out.println("With an opcode of: " + errPacket.getData()[0]+ errPacket.getData()[5]);
+
 				// rethrow so the owner of this Sender knows whats up
 				throw e;
 
@@ -158,6 +186,7 @@ public class Sender {
 
 				logger.error(e.getMessage());
 
+
 				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
 					// send error packet to the unknown TID
 					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
@@ -165,8 +194,16 @@ public class Sender {
 						socket.send(errPacket);			   
 					} catch (IOException ex) {			   
 						logger.error(ex.getMessage());
+						System.out.println("Error Code is " + e.getErrorCode());
+
 						throw e;
-					}
+
+					} 
+					System.out.println( "Client Send error packet from port" + socket.getLocalPort() +"to unknown TID");
+					System.out.println("With block number" + blockNum);
+					System.out.println("Sent from Ip Address: "+ errPacket.getAddress());
+					System.out.println("Sent with packet length of" + errPacket.getLength());
+					System.out.println("With an opcode of: " + errPacket.getData()[0]+ errPacket.getData()[5]);
 				}
 				// rethrow so the owner of this Sender knows whats up
 				throw e;
@@ -190,6 +227,8 @@ public class Sender {
 
 		logger.debug("*** finished transfer ***");
 		logger.debug("========================================\n");
+
+		System.out.println("--------Finished transfer now---------");
 	}
 
 }

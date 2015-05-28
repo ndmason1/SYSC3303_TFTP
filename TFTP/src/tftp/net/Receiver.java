@@ -45,7 +45,8 @@ public class Receiver
 	public void receiveFile(DatagramPacket initPacket, String directoryPath, String filename) throws TFTPException {
 		logger.debug("first packet length: " + initPacket.getLength());
 		logger.debug("first packet data length: " + initPacket.getData().length);
-
+		System.out.println("First packet length" + initPacket.getLength());
+		System.out.println("First data length" + initPacket.getData());
 
 		File theFile = new File(directoryPath+filename);
 		FileOutputStream fileWriter = null;
@@ -54,6 +55,7 @@ public class Receiver
 			try {
 				fileWriter = new FileOutputStream(theFile);
 			} catch (FileNotFoundException e) {
+				System.out.println("Undefined Error");
 				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			} 
 
@@ -63,7 +65,7 @@ public class Receiver
 					theFile.createNewFile();
 				} catch (IOException e) {
 					throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
-				}
+				} System.out.println("File Already Exists" + theFile.getName());
 			}
 
 			// extract data portion
@@ -84,11 +86,14 @@ public class Receiver
 			int blockNum = packetUtil.parseDataPacket(initPacket);
 			logger.debug(String.format("DATA %d received", blockNum));
 			logger.logPacketInfo(initPacket, false);
+			System.out.println("Data received" + blockNum);
+
 
 			// send ACK for initial data packet
 			DatagramPacket sendPacket = packetUtil.formAckPacket(blockNum);
 			logger.debug(String.format("sending ACK %d", blockNum));			
 			logger.logPacketInfo(sendPacket, true);
+			System.out.println("Sending ACK" + blockNum);
 
 			try {
 				socket.send(sendPacket);
@@ -96,12 +101,18 @@ public class Receiver
 				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}
 
+			System.out.println("Sent ACK Packet for file" + theFile.getName());
+			System.out.println("With Opcode of" + sendPacket.getData()[0] + sendPacket.getData()[4]);
+			System.out.println("Packet Length of" + sendPacket.getLength());
+			System.out.println("to the port" + sendPacket.getPort());
+			System.out.println("To the Ip Address" + sendPacket.getAddress());
 			// check if we are done
 			boolean done = initPacket.getLength() < 516;		
 
 			while (!done) {
 				// wait for response
 				logger.debug("waiting for next DATA segment...");
+				System.out.println("Waiting for next Data segment");
 				try {			  
 					socket.receive(receivePacket);
 					//
@@ -111,6 +122,13 @@ public class Receiver
 				}
 				logger.debug(String.format("DATA %d received", blockNum));
 				logger.logPacketInfo(receivePacket, false);
+				System.out.println("Data received for file" + theFile.getName());
+				System.out.println("Data received with block number of: " + blockNum);
+				System.out.println("with an Opcode of: " + receivePacket.getData()[0] + receivePacket.getData()[3]);
+				System.out.println("Data received with Length of" + receivePacket.getLength());
+				System.out.println("Data received from port" + receivePacket.getPort());
+
+
 
 				//Check if the disk is already full, If full generate Error code-3
 				//By Syed Taqi - 2015/05/08
@@ -123,13 +141,18 @@ public class Receiver
 					try {			   
 						socket.send(error);			   
 					} catch (IOException ex) {			   
+
+						System.out.println(msg);	
 						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+
 					}	
 
 					logger.debug(msg);
+
 					throw new TFTPException(msg, PacketUtil.ERR_DISK_FULL);
 
-				}
+				}		
+
 
 				dataLength = receivePacket.getLength() - 4;
 
@@ -154,6 +177,13 @@ public class Receiver
 				logger.debug(String.format("sending ACK %d", blockNum));			
 				logger.logPacketInfo(sendPacket, true);
 
+				System.out.println("Sending ACK with block number" + blockNum);
+				System.out.println("For File" + theFile.getName());
+				System.out.println("To the port" + sendPacket.getPort());
+				System.out.println("To the IP address" + sendPacket.getAddress());
+				System.out.println("With an OPCode of: " + sendPacket.getData()[0] + sendPacket.getData()[4]);
+				System.out.println("With Packet Length of:" + sendPacket.getLength());
+
 				try {
 					socket.send(sendPacket);
 					//
@@ -163,6 +193,7 @@ public class Receiver
 				}
 			}
 			logger.debug("*** finished transfer ***");
+			System.out.println("====Transfer is finished====");
 		} finally {
 			closeFileWriter(fileWriter);
 		}
