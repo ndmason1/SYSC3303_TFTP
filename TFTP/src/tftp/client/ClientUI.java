@@ -43,7 +43,7 @@ public class ClientUI {
 		
 			if (errorSimulator.toLowerCase().equals("yes") || errorSimulator.toLowerCase().equals("y"))
 			{
-				client.setPortNum(68);
+				client.setPortNum(78);
 				check = false;
 			}
 <<<<<<< HEAD

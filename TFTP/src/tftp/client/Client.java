@@ -281,7 +281,7 @@ public class Client {
 			System.exit(1);
 		}
 		
-		PacketParser parser = new PacketParser();
+		PacketParser parser = new PacketParser(receivePacket.getAddress(), receivePacket.getPort());
 		
 		try{
 		    parser.parseAckPacket(receivePacket, 0);
