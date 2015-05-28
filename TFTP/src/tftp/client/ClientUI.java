@@ -46,7 +46,12 @@ public class ClientUI {
 				client.setPortNum(68);
 				check = false;
 			}
+<<<<<<< HEAD
 			if (errorSimulator.toLowerCase().equals("no") || errorSimulator.toLowerCase().equals("n")){
+=======
+			if (errorSimulator.toLowerCase().equals("no") || errorSimulator.toLowerCase().equals("n"))
+			{
+>>>>>>> fb1008aedb964f2af23ab72ecc1dd456e12b9848
 				client.setPortNum(69);
 				check = false;
 			}
