@@ -8,20 +8,10 @@
 
 package tftp.client;
 
-import java.io.File;
-//import java.io.FileNotFoundException;
-//import java.io.IOException;
-//import java.nio.file.AccessDeniedException;
-//import java.nio.file.FileAlreadyExistsException;
-import java.util.HashSet;
 import java.util.Scanner;
 
-//import tftp.Logger;
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
-import tftp.exception.TFTPFileIOException;
-import tftp.exception.TFTPPacketException;
-import tftp.net.PacketUtil;
 
 public class ClientUI {
 
@@ -116,7 +106,7 @@ public class ClientUI {
 				client.checkValidReadOperation();
 			} catch (TFTPException e) {
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
-				System.out.println(e.getMessage());
+				System.out.println("Could not complete request, please try again.");
 			}
 			
 			// send the request
@@ -125,19 +115,12 @@ public class ClientUI {
 			} catch (ErrorReceivedException e) {
 				System.out.println("Error packet received from server!");
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
-				return;
-			} catch (TFTPFileIOException e) {
-				System.out.println("Error: File IO exception from server");
-				System.out.println(e.getMessage());
-				return;
-			} catch (TFTPPacketException e) {
-				System.out.println("Error: Bad packet received from server");
-				System.out.println(e.getMessage());
-				return;			
+				System.out.println("Could not complete request, please try again.");
+				return;		
 			} catch (TFTPException e) {
 				e.printStackTrace();
-				System.out.println("Error code " + e.getErrorCode());
-				System.out.println(e.getMessage());
+				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
+				System.out.println("Could not complete request, please try again.");
 				return;
 			}
 			System.out.println("Read of file " + client.getFilename() + " into directory " + client.getDirectory() + " finished.\n");
@@ -150,17 +133,11 @@ public class ClientUI {
 			} catch (ErrorReceivedException e) {
 				System.out.println("Error packet received from server!");
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
-				return;
-			} catch (TFTPFileIOException e) {
-				System.out.println("Error: File IO exception from server");
-				System.out.println(e.getMessage());
-				return;
-			} catch (TFTPPacketException e) {
-				System.out.println("Error: Bad packet received from server");
-				System.out.println(e.getMessage());
+				System.out.println("Could not complete request, please try again.");
 				return;			
 			} catch (TFTPException e) {
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
+				System.out.println("Could not complete request, please try again.");
 				return;
 			}
 			
@@ -168,6 +145,7 @@ public class ClientUI {
 			    client.sendWriteRequest();
 			}catch (TFTPException e){
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
+				System.out.println("Could not complete request, please try again.");
 				return;
 			}
 			

@@ -11,8 +11,6 @@ package tftp.net;
 import java.net.DatagramPacket;
 import java.net.InetAddress;
 
-import tftp.exception.InvalidRequestException;
-import tftp.exception.TFTPPacketException;
 import tftp.server.thread.OPcodeError;
 
 public class PacketUtil {
@@ -143,32 +141,32 @@ public class PacketUtil {
 		if (data[1] != 3) return -1;
 		return getBlockNumberInt(data[2], data[3]);
 	}
-	
-	/* return error code */
-	public static int parseErrorPacket(DatagramPacket packet) {
-		byte[] data = packet.getData();
-		if (data[0] != 0) return -1;
-		if (data[1] != 5) return -1;
-		if (data[2] != 0) return -1;
-		return data[3];
-	}
-	
-	/* return error message */
-	public static String parseErrorPacketMessage(DatagramPacket packet) throws TFTPPacketException {
-		byte[] data = packet.getData();
-		int i = 4;
-		StringBuilder sb = new StringBuilder();
-		while (data[i] != 0x00) {
-			sb.append((char)data[i]);
-			// reject non-printable values
-			if (data[i] < 0x20 || data[i] > 0x7F)
-				throw new TFTPPacketException("non-printable data inside error message: byte " + i, PacketUtil.ERR_ILLEGAL_OP);			
-			i++;
-		}
-		String msg = sb.toString();
-		return msg;
-				
-	}
+//	
+//	/* return error code */
+//	public static int parseErrorPacket(DatagramPacket packet) {
+//		byte[] data = packet.getData();
+//		if (data[0] != 0) return -1;
+//		if (data[1] != 5) return -1;
+//		if (data[2] != 0) return -1;
+//		return data[3];
+//	}
+//	
+//	/* return error message */
+//	public static String parseErrorPacketMessage(DatagramPacket packet) throws TFTPPacketException {
+//		byte[] data = packet.getData();
+//		int i = 4;
+//		StringBuilder sb = new StringBuilder();
+//		while (data[i] != 0x00) {
+//			sb.append((char)data[i]);
+//			// reject non-printable values
+//			if (data[i] < 0x20 || data[i] > 0x7F)
+//				throw new TFTPPacketException("non-printable data inside error message: byte " + i, PacketUtil.ERR_ILLEGAL_OP);			
+//			i++;
+//		}
+//		String msg = sb.toString();
+//		return msg;
+//				
+//	}
 	
 	public static byte[] getBlockNumberBytes(int blockNum) {
 		byte[] bytes = new byte[2];

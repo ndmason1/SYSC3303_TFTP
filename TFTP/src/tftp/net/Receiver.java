@@ -15,8 +15,6 @@ import java.io.File;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
-import tftp.exception.TFTPFileIOException;
-import tftp.exception.TFTPPacketException;
 import tftp.server.thread.OPcodeError;
 
 public class Receiver
@@ -119,52 +117,50 @@ public class Receiver
 					System.out.println("RECEIVER: about to parse DATA packet with block number " + blockNum);
 					packetParser.parseDataPacket(receivePacket, blockNum);
 
-				} catch (TFTPPacketException e) {
-					// send error packet
-					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-					errPacket.setAddress(receivePacket.getAddress());
-					errPacket.setPort(receivePacket.getPort());
-					try {			   
-						socket.send(errPacket);			   
-					} catch (IOException ex) {			
-						ex.printStackTrace();						
-						continue;
-					}
-					// keep going
-					continue;
-
-				} catch (TFTPFileIOException e) {
-					e.printStackTrace();
-
-					// send error packet to client
-					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-					try {			   
-						socket.send(errPacket);			   
-					} catch (IOException ex) {		
-						ex.printStackTrace();
-						return;
-					}
-					return;
-
 				} catch (ErrorReceivedException e) {
-					// the client sent an error packet, so in most cases don't send a response
-					e.printStackTrace();
+					// the other side sent an error packet, so in most cases don't send a response
 
+					// we could have gotten an error packet from an unknown TID, so we need to respond to that TID
 					if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-						// send error packet to the unknown TID
+						
 						DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+						// address packet to the unknown TID
+						errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+								receivePacket.getAddress(), receivePacket.getPort());
 						try {			   
-							socket.send(errPacket);			   
-						} catch (IOException ex) {	
-							ex.printStackTrace();
-							return;
+							socket.send(errPacket);
+						} catch (IOException ex) { 
+							throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 						}
-					} else return;
-
+					}
+					
+					// rethrow so the owner of this Receiver knows whats up
+					throw e;
+					
 				} catch (TFTPException e) {
-					e.printStackTrace();
-					// this block shouldn't get executed, but needs to be here to compile
+
+					// send error packet
+					DatagramPacket errPacket = null;
+					
+					if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+						// address packet to the unknown TID
+						errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+								receivePacket.getAddress(), receivePacket.getPort());						
+					} else {
+						// packet will be addressed to recipient as usual					
+						errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+					}
+					
+					try {			   
+						socket.send(errPacket);			   
+					} catch (IOException ex) {			   
+						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+					}
+					
+					// rethrow so the owner of this Receiver knows whats up
+					throw e;
 				}
+				
 				//Check if the disk is already full, If full generate Error code-3
 				//By Syed Taqi - 2015/05/08
 				if (theFile.getUsableSpace() < receivePacket.getLength()){				

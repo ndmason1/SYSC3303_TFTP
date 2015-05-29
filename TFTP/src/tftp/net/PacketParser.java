@@ -14,8 +14,6 @@ import java.net.InetAddress;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
-import tftp.exception.TFTPFileIOException;
-import tftp.exception.TFTPPacketException;
 
 /**
  * PacketParser objects can be used to check that packet fields are correct 
@@ -66,7 +64,7 @@ public class PacketParser {
 
 		// check opcode
 		if (data[0] != 0 || data[1] != PacketUtil.READ_FLAG)
-			throw new TFTPPacketException("bad op code, expected RRQ", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("bad op code, expected RRQ", PacketUtil.ERR_ILLEGAL_OP);
 
 		// parse the rest of the request
 		return parseRequestPacket(packet);
@@ -88,7 +86,7 @@ public class PacketParser {
 
 		// check opcode
 		if (data[0] != 0 || data[1] != PacketUtil.WRITE_FLAG)
-			throw new TFTPPacketException("bad op code, expected WRQ", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("bad op code, expected WRQ", PacketUtil.ERR_ILLEGAL_OP);
 
 		// parse the rest of the request
 		return parseRequestPacket(packet);
@@ -112,7 +110,7 @@ public class PacketParser {
 
 		// check opcode
 		if (data[0] != 0 || data[1] != PacketUtil.DATA_FLAG)
-			throw new TFTPPacketException("bad op code, expected DATA", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("bad op code, expected DATA", PacketUtil.ERR_ILLEGAL_OP);
 		
 		// check that the block number is what we expect
 		int blockNum = PacketUtil.getBlockNumberInt(data[2], data[3]);
@@ -123,7 +121,7 @@ public class PacketParser {
 		// check that there is no "extra" data beyond this packet's set length		
 		for (int i = packet.getLength(); i < data.length; i++) {
 			if (data[i] != 0) 
-				throw new TFTPPacketException("data found beyond packet length", PacketUtil.ERR_ILLEGAL_OP);
+				throw new TFTPException("data found beyond packet length", PacketUtil.ERR_ILLEGAL_OP);
 		}			
 	}
 	
@@ -145,7 +143,7 @@ public class PacketParser {
 
 		// check opcode
 		if (data[0] != 0 || data[1] != PacketUtil.ACK_FLAG)
-			throw new TFTPPacketException("bad op code, expected ACK", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("bad op code, expected ACK", PacketUtil.ERR_ILLEGAL_OP);
 		
 		// check that the block number is what we expect
 		int blockNum = PacketUtil.getBlockNumberInt(data[2], data[3]);
@@ -154,7 +152,7 @@ public class PacketParser {
 		}
 		
 		if (packet.getLength() > 4)
-			throw new TFTPPacketException("incorrect packet length", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("incorrect packet length", PacketUtil.ERR_ILLEGAL_OP);
 	}
 	
 	/**
@@ -173,12 +171,12 @@ public class PacketParser {
 		
 		// check opcode
 		if (data[0] != 0 || data[1] != PacketUtil.ERROR_FLAG)
-			throw new TFTPPacketException("bad op code, expected ERROR", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("bad op code, expected ERROR", PacketUtil.ERR_ILLEGAL_OP);
 		
 		// check error code
 		// expect first byte to be 0 since error codes only go up to 7		
 		if (data[2] != 0 || data[3] < 0 || data[3] > 7)
-			throw new TFTPPacketException("unknown error code", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("unknown error code", PacketUtil.ERR_ILLEGAL_OP);
 		
 		byte errCode = data[3];
 		// check message		
@@ -188,7 +186,7 @@ public class PacketParser {
 			sb.append((char)data[i]);
 			// reject non-printable values
 			if (data[i] < 0x20 || data[i] > 0x7F)
-				throw new TFTPPacketException("non-character byte inside error message", PacketUtil.ERR_ILLEGAL_OP);			
+				throw new TFTPException("non-character byte inside error message", PacketUtil.ERR_ILLEGAL_OP);			
 			i++;
 		}
 		String errMsg = sb.toString();
@@ -196,7 +194,7 @@ public class PacketParser {
 		// check length
 		i++;
 		if (i != packet.getLength()) {
-			throw new TFTPPacketException("packet length mismatch", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("packet length mismatch", PacketUtil.ERR_ILLEGAL_OP);
 		}
 		
 		// the error packet itself is fine, so throw ErrorReceived to let other objects know
@@ -211,7 +209,7 @@ public class PacketParser {
 	 * @return 			the filename of the file requested
 	 * @throws 			TFTPPacketException if the packet is badly formatted/corrupted 
 	 */
-	private String parseRequestPacket(DatagramPacket packet) throws TFTPPacketException {
+	private String parseRequestPacket(DatagramPacket packet) throws TFTPException {
 		byte[] data = packet.getData();
 		
 		// validate file name		
@@ -221,7 +219,7 @@ public class PacketParser {
 			sb.append((char)data[i]);
 			// reject non-printable values
 			if (data[i] < 0x20 || data[i] > 0x7F)
-				throw new TFTPPacketException("non-printable data inside file name", PacketUtil.ERR_ILLEGAL_OP);			
+				throw new TFTPException("non-printable data inside file name", PacketUtil.ERR_ILLEGAL_OP);			
 			i++;
 		}
 		String filename = sb.toString();
@@ -239,11 +237,11 @@ public class PacketParser {
 
 		String mode = sb.toString();
 		if (! (mode.toLowerCase().equals("netascii") || mode.toLowerCase().equals("octet")) )			
-			throw new TFTPPacketException("invalid mode", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("invalid mode", PacketUtil.ERR_ILLEGAL_OP);
 
 		// should be at end of packet
 		if (i+1 != packet.getLength())			
-			throw new TFTPPacketException("incorrect packet length", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("incorrect packet length", PacketUtil.ERR_ILLEGAL_OP);
 
 		return filename;
 	}
@@ -254,14 +252,14 @@ public class PacketParser {
 	 * @param  packet	the packet to check
 	 * @throws 			TFTPPacketException if the packet's TID is not known 
 	 */
-	private void checkTID(DatagramPacket packet) throws TFTPPacketException {
+	private void checkTID(DatagramPacket packet) throws TFTPException {
 		
 		System.out.println("checking TID");
 		
 		if (expectedIP != null && !packet.getAddress().equals(expectedIP)) 
-			throw new TFTPPacketException("received packet from unrecognized source IP address", PacketUtil.ERR_UNKNOWN_TID);
+			throw new TFTPException("received packet from unrecognized source IP address", PacketUtil.ERR_UNKNOWN_TID);
 		if (expectedPort != 0 && packet.getPort() != expectedPort) 
-			throw new TFTPPacketException("received packet from unrecognized source port", PacketUtil.ERR_UNKNOWN_TID);
+			throw new TFTPException("received packet from unrecognized source port", PacketUtil.ERR_UNKNOWN_TID);
 	}
 
 }

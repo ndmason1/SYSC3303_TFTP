@@ -16,7 +16,7 @@ import java.net.DatagramSocket;
 import java.net.SocketException;
 import java.util.HashSet;
 
-import tftp.exception.TFTPPacketException;
+import tftp.exception.TFTPException;
 import tftp.net.PacketUtil;
 import tftp.server.thread.WorkerThread;
 import tftp.server.thread.WorkerThreadFactory;
@@ -82,14 +82,14 @@ public class Server {
 			try {
 				worker = threadFactory.createWorkerThread(receivePacket);				
 				worker.start();
-			} catch (TFTPPacketException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			} catch (TFTPException e) {
+				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());				
 			}
 			activatedThreads.add(worker);
 		}
 	}
 
+	// TODO: better way to stop threads, likely using interrupt()
 	public void finishProcessing() {
 		acceptNewConnections = false;
 		for (Thread t : activatedThreads) {
