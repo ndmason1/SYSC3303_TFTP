@@ -52,8 +52,7 @@ public class Server {
 		
 		activatedThreads = new HashSet<WorkerThread>();
 		acceptNewConnections = true;
-		threadCount = 0;		
-		//mainDirectory = Config.getServerDirectory();
+		threadCount = 1;
 	}
 
 	public void cleanup() {
@@ -76,7 +75,7 @@ public class Server {
 				System.exit(1);
 			}
 			
-			System.out.println( (String.format("Request received. Creating handler thread %d", threadCount)) );
+			System.out.println( (String.format("Request received. Creating handler thread %d", threadCount++)) );
 			// spawn a thread to process request
 			WorkerThread worker = null;
 			try {

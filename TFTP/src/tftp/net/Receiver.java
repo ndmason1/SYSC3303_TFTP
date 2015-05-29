@@ -8,14 +8,17 @@
 
 package tftp.net;
 
-import java.io.*;
-import java.net.*;
-import java.util.*;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
-import tftp.server.thread.OPcodeError;
 import tftp.server.thread.WorkerThread;
 
 public class Receiver
@@ -51,10 +54,57 @@ public class Receiver
 	}
 
 	public void receiveFile(DatagramPacket initPacket, File aFile) throws TFTPException {
-		printToConsole("RECEIVER: top of receiveFile()");
 		
-		// parse the first DATA packet and see if we even need to set up 
+		int blockNum = 1;
 		
+		// parse the first DATA packet and see if we even need to continue
+		try {
+			printToConsole("RECEIVER: about to parse DATA packet with block number " + blockNum);
+			packetParser.parseDataPacket(initPacket, blockNum);
+
+		} catch (ErrorReceivedException e) {
+			// the other side sent an error packet, so in most cases don't send a response
+
+			// we could have gotten an error packet from an unknown TID, so we need to respond to that TID
+			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+				
+				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				// address packet to the unknown TID
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						initPacket.getAddress(), initPacket.getPort());
+				try {			   
+					socket.send(errPacket);
+				} catch (IOException ex) { 
+					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+				}
+			}
+			
+			// rethrow so the owner of this Receiver knows whats up
+			throw e;
+			
+		} catch (TFTPException e) {
+
+			// send error packet
+			DatagramPacket errPacket = null;
+			
+			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+				// address packet to the unknown TID
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						initPacket.getAddress(), initPacket.getPort());						
+			} else {
+				// packet will be addressed to recipient as usual					
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+			}
+			
+			try {			   
+				socket.send(errPacket);			   
+			} catch (IOException ex) {			   
+				throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+			}
+			
+			// rethrow so the owner of this Receiver knows whats up
+			throw e;
+		}
 		
 		File theFile = aFile;
 		FileOutputStream fileWriter = null;
@@ -90,8 +140,6 @@ public class Receiver
 			data = new byte[PacketUtil.BUF_SIZE];
 			DatagramPacket receivePacket = new DatagramPacket(data, data.length);
 
-			int blockNum = 1;
-			packetParser.parseDataPacket(initPacket, blockNum);
 
 			// send ACK for initial data packet
 			DatagramPacket sendPacket = packetUtil.formAckPacket(blockNum);
@@ -139,6 +187,7 @@ public class Receiver
 						try {			   
 							socket.send(errPacket);
 						} catch (IOException ex) { 
+							// TODO fix resource leak
 							throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 						}
 					}

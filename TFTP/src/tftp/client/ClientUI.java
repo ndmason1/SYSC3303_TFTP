@@ -118,7 +118,6 @@ public class ClientUI {
 				System.out.println("Could not complete request, please try again.");
 				return;		
 			} catch (TFTPException e) {
-				e.printStackTrace();
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				System.out.println("Could not complete request, please try again.");
 				return;

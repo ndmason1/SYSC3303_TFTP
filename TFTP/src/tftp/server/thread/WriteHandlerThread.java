@@ -42,9 +42,7 @@ public class WriteHandlerThread extends WorkerThread {
 	 * file transfer.
 	 */
 	@Override
-	public void run() {
-		
-		System.out.println("Started read handler thread");
+	public void run() {		
 		
 		byte[] data = reqPacket.getData();
 		
@@ -167,8 +165,8 @@ public class WriteHandlerThread extends WorkerThread {
 			e.printStackTrace();
 		}
 		
-		
-		Receiver r = new Receiver(this, sendRecvSocket, receivePacket.getPort());
+		// set up receiver with request packet's port, as this is the client's TID
+		Receiver r = new Receiver(this, sendRecvSocket, reqPacket.getPort());
 		try {
 			printToConsole("calling receiver.receiveFile()");
 			r.receiveFile(receivePacket, f);
