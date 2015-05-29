@@ -259,9 +259,9 @@ public class PacketParser {
 		System.out.println("checking TID");
 		
 		if (expectedIP != null && !packet.getAddress().equals(expectedIP)) 
-			throw new TFTPPacketException("unrecognized source IP address", PacketUtil.ERR_UNKNOWN_TID);
+			throw new TFTPPacketException("received packet from unrecognized source IP address", PacketUtil.ERR_UNKNOWN_TID);
 		if (expectedPort != 0 && packet.getPort() != expectedPort) 
-			throw new TFTPPacketException("unrecognized source port", PacketUtil.ERR_UNKNOWN_TID);
+			throw new TFTPPacketException("received packet from unrecognized source port", PacketUtil.ERR_UNKNOWN_TID);
 	}
 
 }

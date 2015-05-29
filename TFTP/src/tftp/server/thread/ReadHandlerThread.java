@@ -150,9 +150,7 @@ public class ReadHandlerThread extends WorkerThread {
 		try {			
 			s.sendFile(f);
 		} catch (TFTPException e) {
-			e.printStackTrace();
-			System.out.println("ERROR CODE " + e.getErrorCode());
-			System.out.println(e.getMessage());
+			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 		}
 		
 		cleanup();

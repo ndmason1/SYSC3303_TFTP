@@ -120,17 +120,18 @@ public class Receiver
 					packetParser.parseDataPacket(receivePacket, blockNum);
 
 				} catch (TFTPPacketException e) {
-					e.printStackTrace();
-
 					// send error packet
 					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+					errPacket.setAddress(receivePacket.getAddress());
+					errPacket.setPort(receivePacket.getPort());
 					try {			   
 						socket.send(errPacket);			   
 					} catch (IOException ex) {			
-						ex.printStackTrace();
-						return;
+						ex.printStackTrace();						
+						continue;
 					}
-					return;
+					// keep going
+					continue;
 
 				} catch (TFTPFileIOException e) {
 					e.printStackTrace();

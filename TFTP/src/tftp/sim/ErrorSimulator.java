@@ -1,5 +1,6 @@
 
 package tftp.sim;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -9,13 +10,13 @@ import java.net.UnknownHostException;
 import java.util.LinkedList;
 import java.util.Scanner;
 
+import tftp.net.PacketUtil;
+
 
 public class ErrorSimulator {
 
 	private static final int LISTEN_PORT = 78;
 	private static final int SERVER_PORT = 69;
-
-	private static final int BUF_SIZE = 1024; // use PacketUtil constant instead when this class is merged in
 
 	// sockets used for communicating with the client and server, respectively	
 	private DatagramSocket clientRecvSocket, serverSendRecvSocket;
@@ -36,9 +37,7 @@ public class ErrorSimulator {
 
 	public ErrorSimulator() {
 		try {
-			System.out.println("attempting listen on port 68");
 			clientRecvSocket = new DatagramSocket(LISTEN_PORT);
-			System.out.println("attempting listen on port X");
 			serverSendRecvSocket = new DatagramSocket();
 		} catch (SocketException e) {
 			e.printStackTrace();
@@ -278,8 +277,7 @@ public class ErrorSimulator {
 	private void relayRequestWithoutErrors() {	
 		System.out.println("No error mode selected.\n");
 
-		//byte data[] = new byte[PacketUtil.BUF_SIZE];
-		byte data[] = new byte[BUF_SIZE];
+		byte data[] = new byte[PacketUtil.BUF_SIZE];		
 		receivePacket = new DatagramPacket(data, data.length);			
 		receivePacket.getLength();
 
@@ -366,13 +364,12 @@ public class ErrorSimulator {
 			System.out.println("If WRQ is made, Server will receive DATA 1 from unknown TID");
 		}
 		
-		//byte data[] = new byte[PacketUtil.BUF_SIZE];
-		byte data[] = new byte[BUF_SIZE];
+		byte data[] = new byte[PacketUtil.BUF_SIZE];
 		receivePacket = new DatagramPacket(data, data.length);			
 		receivePacket.getLength();
 
 		// listen for a client packet
-		System.out.println("listening for client packet on port 68...");
+		System.out.printf("listening for client packet on port %d...", LISTEN_PORT);
 		try {
 			clientRecvSocket.receive(receivePacket);
 		} catch (IOException e) {
@@ -391,12 +388,12 @@ public class ErrorSimulator {
 		} else if (receivePacket.getData()[1] == 0x2) {
 			packetType = PacketType.WRQ;
 		} else {
-			System.out.println("Wrong packet type received from client! (expected RRQ or WRQ)");
+			System.out.println("Wrong packet type received from client! (expected RRQ or WRQ) [FAIL]");
 			System.out.println("terminating simulation");
 			return;
 		}
 		
-		// pass request to server
+		// pass request to server (establish client TID to the server)
 		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
 				serverIP, SERVER_PORT);
 		
@@ -420,10 +417,16 @@ public class ErrorSimulator {
 		System.out.println("received server packet");
 		printOpcode(receivePacket);
 		
+		if (isErrorPacket(receivePacket)) {
+			System.out.println("unexpected ERROR packet received from client! [FAIL]");
+			System.out.println("terminating simulation");
+			return;
+		}
+		
 		// save the server's TID for this simulation
 		int serverTID = receivePacket.getPort();
 		
-		// pass server response to client, establish server TID
+		// pass server response to client, establish server TID to the client
 		DatagramSocket clientSendRecvSocket = null;
 		try {
 			clientSendRecvSocket = new DatagramSocket();
@@ -450,7 +453,7 @@ public class ErrorSimulator {
 			System.out.println("IOException caught receiving client packet: " + e.getMessage());			
 			System.exit(1);
 		}	
-		System.out.println("received client packet");
+		System.out.println("received client DATA/ACK packet");
 		printOpcode(receivePacket);
 		
 		// create a new socket to generate TID error
@@ -466,9 +469,10 @@ public class ErrorSimulator {
 		sendPacket.setAddress(serverIP);
 		sendPacket.setPort(serverTID);
 		
-		// if server is receiving the unknown TID packet, then send this from the unknown TID socket
+		
 		if (receiverProcess == ProcessType.SERVER) {
-			
+			System.out.println("sending client packet to server from unknown TID...");
+			// server is receiving the unknown TID packet, send this from the unknown TID socket
 			try {
 				unknownTIDSocket.send(sendPacket);
 			} catch (IOException e) {
@@ -484,35 +488,109 @@ public class ErrorSimulator {
 				System.out.println("IOException caught receiving server packet: " + e.getMessage());			
 				System.exit(1);
 			}	
-			System.out.println("received server packet, checking contents");
+			System.out.println("received server packet");
 			printOpcode(receivePacket);
-			// check error code
 			
-		} else { // client is receiving unknown TID packet, send this out server socket
+			if (receivePacket.getData()[1] == PacketUtil.ERROR_FLAG) {
+				
+				if (receivePacket.getData()[3] == PacketUtil.ERR_UNKNOWN_TID) {
+					String msg = getErrMessage(receivePacket.getData());
+					System.out.println("Server responded with ERROR code 5 as expected! [PASS]");
+					System.out.printf("error message from packet: \"%s\"", msg);
+				} else {
+					String msg = getErrMessage(receivePacket.getData());
+					System.out.printf("Server responded with ERROR code %d (not 5 as expected)", receivePacket.getData()[3]);
+					System.out.printf("error message from packet: \"%s\"", msg);
+				}
+				
+				
+			} else { // not an error packet
+				System.out.println("Server response was not an ERROR packet as expected [FAIL]"); 
+			}
+			
+			
+		} else { 
+			// client is receiving unknown TID packet, send this out server socket
+			System.out.println("sending client packet to server...");
 			try {
 				serverSendRecvSocket.send(sendPacket);
 			} catch (IOException e) {
 				e.printStackTrace();
 				System.exit(1);
 			}
+			
+			// receive server response 
+			System.out.println("waiting for packet from server...");
+			try {
+				serverSendRecvSocket.receive(receivePacket);
+			} catch (IOException e) {
+				e.printStackTrace();			
+				System.exit(1);
+			}	
+			System.out.println("received server packet");
+			printOpcode(receivePacket);
+			
+			// pass response to client from unknown TID socket
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+			sendPacket.setAddress(clientIP);
+			sendPacket.setPort(clientPort);
+
+			System.out.println("sending server packet to client from unknown TID...");
+			try {
+				unknownTIDSocket.send(sendPacket);
+			} catch (IOException e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+
+			// receive client response (should be an ERROR with code 5)
+			System.out.println("waiting for ERROR packet from client...");
+			try {
+				unknownTIDSocket.receive(receivePacket);
+			} catch (IOException e) {
+				e.printStackTrace();			
+				System.exit(1);
+			}	
+			System.out.println("received client packet");
+			printOpcode(receivePacket);
+
+			if (receivePacket.getData()[1] == PacketUtil.ERROR_FLAG) {
+
+				if (receivePacket.getData()[3] == PacketUtil.ERR_UNKNOWN_TID) {
+					String msg = getErrMessage(receivePacket.getData());
+					System.out.println("Client responded with ERROR code 5 as expected! [PASS]");
+					System.out.printf("error message from packet: \"%s\"", msg);
+				} else {
+					String msg = getErrMessage(receivePacket.getData());
+					System.out.printf("Client responded with ERROR code %d (not 5 as expected)", receivePacket.getData()[3]);
+					System.out.printf("error message from packet: \"%s\"", msg);
+				}
+
+
+			} else { // not an error packet
+				System.out.println("Client response was not an ERROR packet as expected [FAIL]"); 
+			}
+			
+			
 		}
 		
-		// get server
+	 
 		
-		
+		System.out.println("\nsimulation complete.");
+		System.out.println("press any key to continue");
+		keyboard.nextLine();
 		
 	}
 
 	private void simulateIllegalOperation() {
 
 
-		//byte data[] = new byte[PacketUtil.BUF_SIZE];
-		byte data[] = new byte[BUF_SIZE];
+		byte data[] = new byte[PacketUtil.BUF_SIZE];		
 		receivePacket = new DatagramPacket(data, data.length);			
 		receivePacket.getLength();
 
 		// listen for a client packet
-		System.out.println("listening for client packet on port 68...");
+		System.out.printf("listening for client packet on port %d...", LISTEN_PORT);
 		try {
 			clientRecvSocket.receive(receivePacket);
 		} catch (IOException e) {
@@ -603,7 +681,7 @@ public class ErrorSimulator {
 	}
 
 	private void getClientPacket() {
-		byte data[] = new byte[BUF_SIZE];
+		byte data[] = new byte[PacketUtil.BUF_SIZE];
 		receivePacket = new DatagramPacket(data, data.length);			
 		receivePacket.getLength();
 
@@ -675,17 +753,39 @@ public class ErrorSimulator {
 
 		int length = 0;
 		for (int i = 2; i < data.length; i++) {
-			if (data[i] == 0)
+			if (data[i] == 0) {
 				length = i - 2;
-			break;
+				break;
+			}
 		}
 
 		return length;
+	}
+	
+	/*
+	 * returns the message from an ERROR packet
+	 */
+	private static String getErrMessage(byte[] data) {
+
+		StringBuilder sb = new StringBuilder();
+		
+		int length = 0;
+		for (int i = 4; i < data.length; i++) {
+			sb.append((char)data[i]);
+			if (data[i] == 0)				
+				break;
+		}
+
+		return sb.toString();
 	}
 
 	private void printOpcode(DatagramPacket packet) {
 		byte[] data = packet.getData();
 		System.out.printf("opcode: %02x %02x\n", data[0], data[1]);
+	}
+	
+	private boolean isErrorPacket(DatagramPacket packet) {
+		return packet.getData()[1] == PacketUtil.ERROR_FLAG;
 	}
 
 	private void quit() {
@@ -695,7 +795,6 @@ public class ErrorSimulator {
 	}
 	
 	private void closeResources() {
-		System.out.println("closing sockets");
 		clientRecvSocket.close();
 		serverSendRecvSocket.close();
 	}

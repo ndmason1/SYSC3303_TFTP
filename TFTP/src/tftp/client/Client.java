@@ -91,7 +91,7 @@ public class Client {
 	
 	public void checkValidReadOperation() throws TFTPException {
 			
-		//Checking if the file already exists?
+		// note that we are not throwing an exception here as we are allowing overwrites on either side
 		if (getFile().exists()){
 			
 			//Checking if user can read the file
@@ -100,11 +100,7 @@ public class Client {
 				System.out.println(msg);
 				throw new TFTPException(msg, PacketUtil.ERR_ACCESS_VIOLATION);
 			}
-			
-			throw new TFTPException("destination file exists", PacketUtil.ERR_FILE_EXISTS);
-
-		}
-		
+		}		
 	}
 	
 	public void checkValidWriteOperation() throws TFTPException {
@@ -168,9 +164,7 @@ public class Client {
 		return msg;
 	}	
 
-	public void sendReadRequest() throws TFTPException{
-		
-		System.out.println("path name is " + getDirectory());
+	public void sendReadRequest() throws TFTPException{		
 
 		System.out.println("Starting read of file " + getFilename() + " from server...");
 
@@ -182,9 +176,6 @@ public class Client {
 		} catch (UnknownHostException e) {
 			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 		}
-
-		//logger.logPacketInfo(sendPacket, true);
-
 
 		try {
 			sendReceiveSocket.send(sendPacket);
@@ -210,46 +201,36 @@ public class Client {
         	//receive first data packet with block #1
         	parser.parseDataPacket(receivePacket, 1);
         }catch(ErrorReceivedException e){
-        	//logger.error(e.getMessage());
         	System.out.println(e.getMessage());
             throw e;
         }catch(TFTPPacketException ex){
-        	//logger.error(ex.getMessage());
         	System.out.println(ex.getMessage());
         	PacketUtil packetUtil = new PacketUtil(receivePacket.getAddress(),receivePacket.getPort());
         	DatagramPacket errPkt = packetUtil.formErrorPacket(ex.getErrorCode(), ex.getMessage());
         	try {
 				sendReceiveSocket.send(errPkt);
 			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				e.printStackTrace();				
 			}
         	if (ex.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP){
-        		//logger.error("File transfer can not start, terminating");
         		System.out.println("File transfer can not start, terminating");
         	    return;
         	}
         }catch(TFTPFileIOException exs){
-        	//logger.error(exs.getMessage());
         	System.out.println(exs.getMessage());
         	throw exs;
         }catch(TFTPException w){
-        	//logger.error(w.getMessage());
         	System.out.println(w.getMessage());
         	return;
         }
         
-		// assume our request is good, set up a receiver to proceed with the transfer
+		// request is good, set up a receiver to proceed with the transfer
 		Receiver r = new Receiver(sendReceiveSocket, receivePacket.getPort());
 		r.receiveFile(receivePacket, getFile());
 	}
 
 	public void sendWriteRequest() throws TFTPException {
 		
-		//String[] pathSegments = fullpath.split("\\"+File.separator);
-		//String filename = pathSegments[pathSegments.length-1];S
-		
-		//logger.info(String.format("Starting write of file %s from server...", filename));
 		System.out.println("Starting write of file + " + getFilename() + " from server...");
 		byte[] payload = prepareWriteRequestPayload();
 
@@ -286,17 +267,8 @@ public class Client {
 		try{
 		    parser.parseAckPacket(receivePacket, 0);
 		}catch(ErrorReceivedException e){
-			//logger.error(e.getMessage());
 			System.out.println(e.getMessage());
-            if(e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID){
-            	//request may sent to different port, so resend it
-            	sendWriteRequest();
-            }
             
-            if (e.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP ){
-            	//request may damaged, resend it
-            	sendWriteRequest();
-            }
 		}catch(TFTPPacketException ex){
 			//logger.error(ex.getMessage());
 			System.out.println(ex.getMessage());
