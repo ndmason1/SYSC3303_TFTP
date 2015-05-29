@@ -149,7 +149,7 @@ public class ClientUI {
 				return;
 			}
 			
-			System.out.println("Read of file " + client.getFilename() + " into directory " + client.getDirectory() + " finished.\n");
+			System.out.println("Write of file " + client.getFilename() + " from directory " + client.getDirectory() + " finished.\n");
 		} else {
 			System.out.println("Invalid request type.");
 			printHelp();

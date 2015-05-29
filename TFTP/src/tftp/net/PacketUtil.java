@@ -55,7 +55,7 @@ public class PacketUtil {
 
 		// opcode
 		msg[0] = 0x00;
-		msg[1] = READ_FLAG;
+		msg[1] = flag;
 
 		// filename
 		byte[] fbytes = filename.getBytes(); 
