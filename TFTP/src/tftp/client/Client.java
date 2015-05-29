@@ -51,7 +51,8 @@ public class Client {
 			System.exit(1);
 		}
 		
-		targetPort = Config.getSimulateErrors() ? 68 : 69;
+		//targetPort = Config.getSimulateErrors() ? 68 : 69;
+		targetPort = 68;
 
 		//logger = Logger.getInstance();				
 	}
@@ -314,8 +315,6 @@ public class Client {
 			System.out.println(e.getMessage());
 		}
 	}
-
-
 }
 
 

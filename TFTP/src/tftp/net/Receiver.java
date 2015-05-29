@@ -24,7 +24,6 @@ public class Receiver
 
 	private InetAddress senderIP;
 	private PacketUtil packetUtil;
-	private Logger logger;
 	private String Folder = System.getProperty("user.dir")+"/Client_files";
 	static String filename; 			//name of the file
 
@@ -39,14 +38,10 @@ public class Receiver
 
 		this.socket = socket;		
 		packetUtil = new PacketUtil(senderIP, senderTID);
-		logger = Logger.getInstance();
 	}
 
 	public void receiveFile(DatagramPacket initPacket, String directoryPath, String filename) throws TFTPException {
-		logger.debug("first packet length: " + initPacket.getLength());
-		logger.debug("first packet data length: " + initPacket.getData().length);
-
-
+		
 		File theFile = new File(directoryPath+filename);
 		FileOutputStream fileWriter = null;
 		try { // outer try with finally block so fileWriter gets closed
@@ -82,13 +77,11 @@ public class Receiver
 			DatagramPacket receivePacket = new DatagramPacket(data, data.length);
 
 			int blockNum = packetUtil.parseDataPacket(initPacket);
-			logger.debug(String.format("DATA %d received", blockNum));
-			logger.logPacketInfo(initPacket, false);
+			System.out.println(String.format("DATA %d received", blockNum));
 
 			// send ACK for initial data packet
 			DatagramPacket sendPacket = packetUtil.formAckPacket(blockNum);
-			logger.debug(String.format("sending ACK %d", blockNum));			
-			logger.logPacketInfo(sendPacket, true);
+			System.out.println(String.format("sending ACK %d", blockNum));
 
 			try {
 				socket.send(sendPacket);
@@ -101,7 +94,7 @@ public class Receiver
 
 			while (!done) {
 				// wait for response
-				logger.debug("waiting for next DATA segment...");
+				System.out.println("waiting for next DATA segment...");
 				try {			  
 					socket.receive(receivePacket);
 					//
@@ -109,9 +102,8 @@ public class Receiver
 					ex.printStackTrace();
 					System.exit(1);
 				}
-				logger.debug(String.format("DATA %d received", blockNum));
-				logger.logPacketInfo(receivePacket, false);
-
+				System.out.println(String.format("DATA %d received", blockNum));
+				
 				//Check if the disk is already full, If full generate Error code-3
 				//By Syed Taqi - 2015/05/08
 				if (theFile.getUsableSpace() < receivePacket.getLength()){				
@@ -126,7 +118,6 @@ public class Receiver
 						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 					}	
 
-					logger.debug(msg);
 					throw new TFTPException(msg, PacketUtil.ERR_DISK_FULL);
 
 				}
@@ -151,8 +142,8 @@ public class Receiver
 				blockNum = packetUtil.parseDataPacket(receivePacket);
 				// TODO verify block num
 				sendPacket = packetUtil.formAckPacket(blockNum);
-				logger.debug(String.format("sending ACK %d", blockNum));			
-				logger.logPacketInfo(sendPacket, true);
+				System.out.println(String.format("sending ACK %d", blockNum));		
+				
 
 				try {
 					socket.send(sendPacket);
@@ -162,7 +153,7 @@ public class Receiver
 					System.exit(1);
 				}
 			}
-			logger.debug("*** finished transfer ***");
+			System.out.println("*** finished transfer ***");
 		} finally {
 			closeFileWriter(fileWriter);
 		}

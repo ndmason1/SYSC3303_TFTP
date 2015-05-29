@@ -49,10 +49,6 @@ public abstract class WorkerThread extends Thread {
 	 */
 	protected int clientPort;
 	
-	/**
-	 * Logger object used for logging debug/error messages.
-	 */
-	protected Logger logger;
 	
 	protected PacketParser packetParser;
 	
@@ -73,7 +69,7 @@ public abstract class WorkerThread extends Thread {
 			e.printStackTrace();
 		}
 		
-		logger = Logger.getInstance();
+		
 		packetParser = new PacketParser(reqPacket.getAddress(), reqPacket.getPort());
 	}
 	

@@ -9,23 +9,16 @@
 
 package tftp.server;
 
-import java.io.File;
+
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.SocketException;
 import java.util.HashSet;
-import java.util.Set;
 
-import tftp.exception.InvalidRequestException;
 import tftp.exception.TFTPPacketException;
 import tftp.Config;
-import tftp.Logger;
-import tftp.Util;
 import tftp.net.PacketUtil;
-import tftp.net.Receiver;
-import tftp.net.Sender;
 import tftp.server.thread.WorkerThread;
 import tftp.server.thread.WorkerThreadFactory;
 
@@ -40,7 +33,7 @@ public class Server {
 	
 	private WorkerThreadFactory threadFactory;
 	private HashSet<WorkerThread> activatedThreads;
-	private Logger logger;
+	
 	private boolean acceptNewConnections;
 	private int threadCount;
 	private String mainDirectory;	
@@ -54,8 +47,7 @@ public class Server {
 			System.exit(1);
 		}
 		
-		threadFactory = new WorkerThreadFactory();		
-		logger = Logger.getInstance();
+		threadFactory = new WorkerThreadFactory();	
 		
 		activatedThreads = new HashSet<WorkerThread>();
 		acceptNewConnections = true;
@@ -64,7 +56,6 @@ public class Server {
 	}
 
 	public void cleanup() {
-		logger.flushMessages();
 		receiveSocket.close();
 	}
 
@@ -80,14 +71,11 @@ public class Server {
 				receiveSocket.receive(receivePacket);
 				
 			} catch (IOException e) {
-				logger.error("IO Exception: likely:");
-				logger.error("Receive Socket Timed Out.\n" + e);
 				e.printStackTrace();
 				System.exit(1);
 			}			
-			System.out.println("received packet on port 69");
-			logger.logPacketInfo(receivePacket, false);
-			logger.info(String.format("Request received. Creating handler thread %d", threadCount));
+			
+			System.out.println( (String.format("Request received. Creating handler thread %d", threadCount)) );
 			// spawn a thread to process request
 			WorkerThread worker = null;
 			try {

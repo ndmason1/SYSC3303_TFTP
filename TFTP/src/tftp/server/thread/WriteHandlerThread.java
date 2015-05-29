@@ -57,39 +57,35 @@ public class WriteHandlerThread extends WorkerThread {
 			filename = packetParser.parseWRQPacket(reqPacket);
 			
 		} catch (TFTPPacketException e) {
-			e.printStackTrace();
-			logger.error(e.getMessage());
+			
 			
 			// send error packet
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {			
-				ex.printStackTrace();
-				logger.error(ex.getMessage());
+			} catch (IOException ex) {	
+				System.out.printf("ERROR: IOException: %s\n", ex.getMessage());
 				return;
 			}
 			return;
 			
 		} catch (TFTPFileIOException e) {
-			e.printStackTrace();
-			logger.error(e.getMessage());
+			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 			
 			// send error packet to client
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
 			} catch (IOException ex) {		
-				ex.printStackTrace();
-				logger.error(ex.getMessage());
+				System.out.printf("ERROR: IOException: %s\n", ex.getMessage());
 				return;
 			}
 			return;
 			
 		} catch (ErrorReceivedException e) {
 			// the client sent an error packet, so in most cases don't send a response
-			e.printStackTrace();
-			logger.error(e.getMessage());
+			System.out.println("Error packet received from client!");
+			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 			
 			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
 				// send error packet to the unknown TID
@@ -98,15 +94,14 @@ public class WriteHandlerThread extends WorkerThread {
 					sendReceiveSocket.send(errPacket);			   
 				} catch (IOException ex) {	
 					ex.printStackTrace();
-					logger.error(ex.getMessage());
+					System.out.printf("ERROR: IOException: %s\n", ex.getMessage());
 					return;
 				}
 			} else return;
 			
 		} catch (TFTPException e) {
-			e.printStackTrace();
+			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 			// this block shouldn't get executed, but needs to be here to compile
-			logger.error(e.getMessage());
 		}
 				
 			
@@ -172,13 +167,11 @@ public class WriteHandlerThread extends WorkerThread {
 		
 		DatagramPacket initAck = packetUtil.formAckPacket(0);
 		
-		logger.logPacketInfo(initAck, true);
 		
 		try {
 			sendRecvSocket.send(initAck);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			logger.error(e.getMessage());
+			System.out.printf("ERROR: IOException: %s\n", e.getMessage());
 			e.printStackTrace();
 		}
 		
@@ -191,14 +184,12 @@ public class WriteHandlerThread extends WorkerThread {
 			e.printStackTrace();
 		}
 		
-		logger.logPacketInfo(receivePacket, false);
 		
 		Receiver r = new Receiver(sendRecvSocket, receivePacket.getPort());
 		try {
 			r.receiveFile(receivePacket, Config.getServerDirectory(), filename);
 		} catch (TFTPException e) {
-			logger.error(e.getMessage());
-			e.printStackTrace();
+			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 		} finally {		
 			cleanup();
 		}

@@ -32,7 +32,6 @@ public class Sender {
 	private int fileLength, bytesRead;
 	private InetAddress receiverIP;	
 	private PacketUtil packetUtil;	
-	private Logger logger;
 	private PacketParser parser;
 
 	public Sender(DatagramSocket socket, int receiverPort){
@@ -46,7 +45,6 @@ public class Sender {
 		this.socket = socket;		
 		packetUtil = new PacketUtil(receiverIP, receiverPort);
 		parser = new PacketParser(receiverIP, receiverPort);
-		logger = Logger.getInstance();
 	}
 
 	public void sendFile(File theFile) throws TFTPException {
@@ -64,8 +62,8 @@ public class Sender {
 		
 		int blockNum = 1;
 
-		logger.debug("*** Filename: " + theFile.getName() + " ***");
-		logger.debug("*** Bytes to send: " + fileLength + " ***");
+		System.out.println("*** Filename: " + theFile.getName() + " ***");
+		System.out.println("*** Bytes to send: " + fileLength + " ***");
 
 		byte[] sendBuf = new byte[512]; // need to make this exactly our block size so we only read that much
 		byte[] recvBuf = new byte[PacketUtil.BUF_SIZE];
@@ -87,26 +85,24 @@ public class Sender {
 			DatagramPacket sendPacket = packetUtil.formDataPacket(sendBuf, bytesRead, blockNum);
 
 
-			logger.debug(String.format("Sending segment %d with %d byte payload.", blockNum, bytesRead));
+			System.out.println(String.format("Sending segment %d with %d byte payload.", blockNum, bytesRead));
 
 			try {
 				socket.send(sendPacket);
 			} catch (IOException e) {
 				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}
-			logger.logPacketInfo(sendPacket, true);
 
 			DatagramPacket reply = new DatagramPacket(recvBuf, recvBuf.length);
 
 			// expect an ACK from the other side
 		
-			logger.debug(String.format("waiting for ACK %d", blockNum));
+			System.out.println(String.format("waiting for ACK %d", blockNum));
 			try {
 				socket.receive(reply);
 			} catch (IOException e) {
 				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}                
-			logger.logPacketInfo(reply, false);
 
 			// parse ACK to ensure it is correct before continuing
 			try {
@@ -114,7 +110,6 @@ public class Sender {
 
 			} catch (TFTPPacketException e) {
 
-				logger.error(e.getMessage());
 
 				// send error packet
 				DatagramPacket errPacket = null;
@@ -130,8 +125,7 @@ public class Sender {
 				
 				try {			   
 					socket.send(errPacket);			   
-				} catch (IOException ex) {			   
-					logger.error(ex.getMessage());						
+				} catch (IOException ex) {
 					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 				}
 				// rethrow so the owner of this Sender knows whats up
@@ -139,15 +133,13 @@ public class Sender {
 
 			} catch (TFTPFileIOException e) {
 
-				logger.error(e.getMessage());
 
 				// send error packet
 				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 				try {			   
 					socket.send(errPacket);			   
-				} catch (IOException ex) {			   
-					logger.error(ex.getMessage());
-					return;
+				} catch (IOException ex) {	
+					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 				}
 				
 				// rethrow so the owner of this Sender knows whats up
@@ -156,16 +148,15 @@ public class Sender {
 			} catch (ErrorReceivedException e) {
 				// the client sent an error packet, so in most cases don't send a response
 
-				logger.error(e.getMessage());
+				
 
 				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
 					// send error packet to the unknown TID
 					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 					try {			   
 						socket.send(errPacket);			   
-					} catch (IOException ex) {			   
-						logger.error(ex.getMessage());
-						throw e;
+					} catch (IOException ex) {		
+						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 					}
 				}
 				// rethrow so the owner of this Sender knows whats up
@@ -173,7 +164,7 @@ public class Sender {
 
 			} catch (TFTPException e) {
 				// this block shouldn't get executed, but needs to be here to compile
-				logger.error(e.getMessage());
+				
 				// rethrow so the owner of this Sender knows whats up
 				throw e;
 			}
@@ -188,8 +179,8 @@ public class Sender {
 
 		} while (!done);
 
-		logger.debug("*** finished transfer ***");
-		logger.debug("========================================\n");
+		System.out.println("*** finished transfer ***");
+		System.out.println("========================================\n");
 	}
 
 }
