@@ -1,254 +1,716 @@
-/*
- * Intermediary.java
- * TEAM 1
- * 
- * Last updated: 07/05/2015
- * 
- * This file was created specifically for the course SYSC 3303.
- * 
- */
 
 package tftp.sim;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.LinkedList;
+import java.util.Scanner;
 
-
-import java.io.*;
-import java.net.*;
-import java.util.*;
 
 public class ErrorSimulator {
-	
-	public static final int ErrorSimPort = 68;
-	
-	
-	//OPcode errors
-	public static final int NETWORK = 0;
-	public static final int PACKET = 1;
-	public static final int TID = 2;
 
-	
-	public static final int DATA = 1;
-	public static final int ACK = 2;
-	public static final int REQ = 3;
+	private static final int LISTEN_PORT = 78;
+	private static final int SERVER_PORT = 69;
 
-	private byte packetType;
-	private byte blockNumber;
-	private int errorDetail;
-	protected Error error;
-	
-	private DatagramSocket sendReceieveSocket;
-	
-	
-	public ErrorSimulator()
-	{
+	private static final int BUF_SIZE = 1024; // use PacketUtil constant instead when this class is merged in
+
+	// sockets used for communicating with the client and server, respectively	
+	private DatagramSocket clientRecvSocket, serverSendRecvSocket;
+
+	// packet objects to use for sending and receiving messages
+	private DatagramPacket sendPacket, receivePacket;
+
+	// keep track of network address
+	private InetAddress serverIP, clientIP;
+	private int clientPort;	
+
+	// for input
+	private Scanner keyboard;
+	private ProcessType receiverProcess;
+	private ErrorType errorType;
+	private IllegalOperationType illegalOpType;
+	private PacketType packetType;	
+
+	public ErrorSimulator() {
 		try {
-			sendReceieveSocket = new DatagramSocket(ErrorSimPort);
-		} catch (SocketException se) {
-			se.printStackTrace();
-			System.exit(1); 
+			System.out.println("attempting listen on port 68");
+			clientRecvSocket = new DatagramSocket(LISTEN_PORT);
+			System.out.println("attempting listen on port X");
+			serverSendRecvSocket = new DatagramSocket();
+		} catch (SocketException e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+
+		try {
+			serverIP = InetAddress.getLocalHost(); // THIS WILL CHANGE IN ITERATION 5
+		} catch (UnknownHostException e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+
+		keyboard = new Scanner(System.in);
+
+		System.out.println("==== TFTP ERROR SIMULATOR STARTED ====\n");
+
+		// print IP (useful for iteration 5)
+		try {
+			System.out.println("Hostname / Host IP: " + InetAddress.getLocalHost());
+		} catch (UnknownHostException e) {
+			// ignore
 		}
 	}
-	
-	
 
-	public DatagramPacket FormPacket() throws UnknownHostException
-	{
-		byte data[] = new byte[516];
-		DatagramPacket packet = new DatagramPacket(data, data.length);
+	public void showMainMenu() {
+		System.out.println("Please select the type of error to simulate: \n");		
+		System.out.println("(1) Illegal operation (TFTP error code 4)");
+		System.out.println("(2) Unknown TID (TFTP error code 5)");
+		// add others here, probably
+		System.out.println("(9) No error (packets will be relayed unmodified)");
+		System.out.println("[ PRESS Q TO QUIT ]\n");
+
+		switch (getInput()) {
+		case 1: 
+			errorType = ErrorType.ILLEGAL_OP;
+			showProcessMenu();
+			break;
+
+		case 2:
+			errorType = ErrorType.UNKNOWN_TID;
+			showProcessMenu();
+			break;
+
+		case 9:
+			errorType = ErrorType.NONE;
+			relayRequestWithoutErrors();
+			break;
+		}
+	}
+
+	private void showProcessMenu() {
+
+		// build message based on previous selection
+		String message = errorType == ErrorType.ILLEGAL_OP ?
+				"Illegal operation" :
+					"Uknown TID"; 
+		message += " error selected.";
+
+		System.out.println(message);
+		System.out.println("Which process should receive the invalid packet? \n");		
+		System.out.println("(1) Client");
+		System.out.println("(2) Server");
+		System.out.println("[ PRESS Q TO QUIT ]\n");
+
+		switch (getInput()) {
+		case 1: 
+			receiverProcess = ProcessType.CLIENT;
+			break;
+		case 2:
+			receiverProcess = ProcessType.SERVER;
+		}
+
+		switch (errorType) {
+		case ILLEGAL_OP:
+			showPacketTypeMenu();
+			break;
+
+		case UNKNOWN_TID:			
+			simulateUnknownTID();
+			break;
+
+		case NONE:
+			break;
+		}
+	}
+
+	private void showPacketTypeMenu() {
+
+		// build message based on previous selection
+		String message = receiverProcess == ProcessType.CLIENT ?
+				"Client" :
+				"Server"; 
+		message += " selected.";
+
+		System.out.println(message);
+		System.out.println("Please choose which packet type should be modified:\n");
+		System.out.println("(1) RRQ");
+		System.out.println("(2) WRQ");
+		System.out.println("(3) DATA");
+		System.out.println("(4) ACK");
+		System.out.println("(5) ERROR");
+		System.out.println("[ PRESS Q TO QUIT ]\n");
+
+		switch (getInput()) {
+		case 1:
+			packetType = PacketType.RRQ;
+			break;
+
+		case 2:
+			packetType = PacketType.WRQ;
+			break;
+
+		case 3:
+			packetType = PacketType.DATA;
+			break;
+
+		case 4:
+			packetType = PacketType.ACK;
+			break;
+
+		case 5:
+			packetType = PacketType.ERROR;
+			break;
+		}
+
+		showIllegalOpTypeMenu();
+	}
+
+	private void showIllegalOpTypeMenu() {
+
+		// build message based on previous selection
+		String message = packetType.name() + " packet selected";
+		System.out.println(message);
+
+		LinkedList<String> options = new LinkedList<String>();
+		options.add("(1) Invalid op-code");
+		options.add("(2) Length (contents of packet not modified)");
+
+		// generate more options based on packet selection
+		// TODO: enable more specific options e.g. exact byte?		
+		switch (packetType) {
+		case RRQ:
+		case WRQ:			
+			options.add("(3) Filename");
+			options.add("(4) Transfer mode");
+			break;
+
+		case DATA:
+		case ACK:
+			options.add("(3) Block number");
+			break;
+
+		case ERROR:
+			options.add("(3) Error code");
+			options.add("(4) Error message");
+			break;
+		}
+
+		System.out.println("Please choose what field should be modified to generate the error:\n");
+		for (String option : options) {
+			System.out.println(option);
+		}
+		System.out.println("[ PRESS Q TO QUIT ]\n");
+
+		switch (getInput()) {
+		case 1:
+			illegalOpType = IllegalOperationType.OPCODE;
+			break;
+
+		case 2:
+			illegalOpType = IllegalOperationType.LENGTH_TOO_SHORT;
+			break;
+
+		case 3:
+			// option 3 depends on chosen packet type
+			switch (packetType) {
+			case RRQ:
+			case WRQ:
+				illegalOpType = IllegalOperationType.FILENAME;
+				break;
+
+			case DATA:
+			case ACK:
+				illegalOpType = IllegalOperationType.BLOCKNUM;
+				break;
+
+			case ERROR:
+				illegalOpType = IllegalOperationType.ERRCODE;
+			}
+
+			break;
+
+		case 4:
+			// option 4 depends on chosen packet type
+			switch (packetType) {
+			case RRQ:
+			case WRQ:
+				illegalOpType = IllegalOperationType.MODE;
+				break;
+
+			case DATA:
+			case ACK:
+				throw new RuntimeException("invalid option chosen from illegal op menu");
+
+			case ERROR:
+				illegalOpType = IllegalOperationType.ERRMSG;
+			}			
+		}
+
+		System.out.println("\nChosen parameters: ");
+		System.out.println("Process to receive error: " + receiverProcess.name());
+		System.out.println("Packet type to modify: " + packetType.name());
+		System.out.println("Packet field/property to modify: " + illegalOpType.name());
+		System.out.println("\n");
+
+		System.out.println("==== EXECUTING SIMULATION ====");
+
+		// start simulation
+	}
+
+	private int getInput() {
+
+		String input = null;
+
+		do {
+			System.out.print("> ");
+			input = keyboard.nextLine();
+			if (input.toLowerCase().charAt(0) == 'q')
+				quit();
+
+		} while (!input.matches("[1-9]")); // keep looping until single digit is entered 
+
+		return Integer.parseInt(input);
+	}
+
+	private void relayRequestWithoutErrors() {	
+		System.out.println("No error mode selected.\n");
+
+		//byte data[] = new byte[PacketUtil.BUF_SIZE];
+		byte data[] = new byte[BUF_SIZE];
+		receivePacket = new DatagramPacket(data, data.length);			
+		receivePacket.getLength();
+
+		// listen for a client packet
+		System.out.println("listening for client packet on port 68...");
 		try {
-			System.out.println("Waiting for packet from client on port "+ ErrorSimPort);
-			sendReceieveSocket.receive(packet);
+			clientRecvSocket.receive(receivePacket);
+		} catch (IOException e) {
+			System.out.println("IOException caught receiving client packet: " + e.getMessage());			
+			System.exit(1);
+		}	
+		System.out.println("received client packet");
+		printOpcode(receivePacket);
+
+
+		clientIP = receivePacket.getAddress();
+		clientPort = receivePacket.getPort();
+		// copy the data to a new packet
+
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, SERVER_PORT);
+
+		// send new packet to server
+
+		try {
+			serverSendRecvSocket.send(sendPacket);
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		System.out.println("Recieved Packet");
-		return packet;
-	
-	}
-	
-	
 
-	public void setupErrorMode(Scanner scanner) {
-		
-		int input;
-		System.out.println("Which type of error do you wish to generate? (select by number):");
-		System.out.println("0) No Error");
-		System.out.println("4) Packet Error");
-		System.out.println("5) TID Error");
-		System.out.println("8) Delayed Packet");
-		System.out.println("9) Deleted Packet");
-		System.out.println("10) Duplicated Packet");
-		System.out.println("Choose: ");
-		
-		for(;;) {
-				input = scanner.nextInt();
-			if(input==0) {
-				this.error = new Error();
-				return;
-			}
-			if(input==4) {
-				System.out.println("Packet Error!");
-				packetError(scanner);
-				break;
-			} else if(input==5) {
-				System.out.println("TID Error!");
-				TIDError(scanner);
-				break;
-			} else if(input>=8 && input<=10) {
-				errorDetail = input;
-				networkError(scanner);
-				break;
-			}
-			System.out.println("Invalid option.  Please try again:");
-			
+		// receive server response
+		System.out.println("waiting for server response...");
+		try {
+			serverSendRecvSocket.receive(receivePacket);
+		} catch (IOException e) {
+			System.out.println("IOException caught receiving server packet: " + e.getMessage());			
+			System.exit(1);
+		}	
+		System.out.println("received server packet");
+		printOpcode(receivePacket);
+
+
+		// copy the data to a new packet
+
+		// set up a new socket to send to the client
+		DatagramSocket clientSendSocket = null;
+		try {
+			clientSendSocket = new DatagramSocket();
+		} catch (SocketException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
 		}
-	}
-	
-	private void TIDError(Scanner scanner) {
-		System.out.println("TID Error:");
-		System.out.println();
-		System.out.println("Packet type to initiate error:");
-		System.out.println("1) DATA");
-		System.out.println("2) ACK");
-		for(;;) {
-			this.packetType = scanner.nextByte();
-			if (this.packetType!=DATA || this.packetType!=ACK) break;
-			System.out.println("Invalid block selection.  Please try again:");
-		} 
-		
-		System.out.println();
-		System.out.println();
-		
-		System.out.println("Please select a block number to trigger the error (Must be under 127): ");
-		for(;;) {
-			this.blockNumber = scanner.nextByte();
-			if (this.blockNumber>0 || (this.blockNumber==0 && this.packetType == (byte) 1)) break;
-			System.out.println("Invalid block number selection.  Please try again:");
-		} 
-		error = new Error(TID, this.packetType, new Message(this.blockNumber));
-	}
-	
-	private void networkError(Scanner scanner) {
 
-				System.out.println("Network Error:");
-				System.out.println();
-				System.out.println("Select packet type:");
-				System.out.println("1) DATA");
-				System.out.println("2) ACK");
-				System.out.println("3) REQ");
-				for(;;) {
-					this.packetType = scanner.nextByte();
-					if (this.packetType!=DATA || this.packetType!=ACK || this.packetType!=REQ) break;
-					System.out.println("Invalid block selection.  Please try again:");
-				} 
-				
-				System.out.println();
-				System.out.println();
-				
-				if (this.packetType == REQ) {
-					error = new Error(0, this.packetType, new Message(this.blockNumber),this.errorDetail);
-					return;
-				}
-				
-				//Select Block Number
-				System.out.println("Please select a block number to trigger the error (Must be under 127): ");
-				for(;;) {
-					this.blockNumber = scanner.nextByte();
-					if (this.blockNumber>0) break;
-					System.out.println("Invalid block number selection.  Please try again:");
-				}
-				error = new Error(0, this.packetType, new Message(this.blockNumber),this.errorDetail);
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
+
+		// send new packet to client
+		System.out.println("sending server response to client...");
+		try {
+			clientSendSocket.send(sendPacket);
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+
+		System.out.println("response sent - simulation complete.");
+		System.out.println("press any key to continue");
+		keyboard.nextLine();
 	}
 	
-	
+	private void simulateUnknownTID() {
+		
+		// build message based on previous selection
+		String message = receiverProcess == ProcessType.CLIENT ?
+				"Client" :
+					"Server"; 
+		message += " selected.";
+		System.out.println(message);
+		
+		if (receiverProcess == ProcessType.CLIENT) {
+			System.out.println("If RRQ is made, Client will receive DATA 2 from unknown TID");
+			System.out.println("If WRQ is made, Client will receive ACK 1 from unknown TID");			
+		} else { // receiverProcess == ProcessType.SERVER
+			System.out.println("If RRQ is made, Server will receive ACK 1 from unknown TID");
+			System.out.println("If WRQ is made, Server will receive DATA 1 from unknown TID");
+		}
+		
+		//byte data[] = new byte[PacketUtil.BUF_SIZE];
+		byte data[] = new byte[BUF_SIZE];
+		receivePacket = new DatagramPacket(data, data.length);			
+		receivePacket.getLength();
 
-	private void packetError(Scanner scanner) {
-		//Select Packet Type
-		System.out.println("Packet Error:");
-		System.out.println();
-		System.out.println("Packet type to corrupt:");
-		System.out.println("1) DATA");
-		System.out.println("2) ACK");
-		System.out.println("3) REQ");
-		for(;;) {
-			this.packetType = scanner.nextByte();
-			if (this.packetType!=DATA || this.packetType!=ACK || this.packetType!=REQ) break;
-			System.out.println("Invalid block selection.  Please try again:");
-		} 
+		// listen for a client packet
+		System.out.println("listening for client packet on port 68...");
+		try {
+			clientRecvSocket.receive(receivePacket);
+		} catch (IOException e) {
+			System.out.println("IOException caught receiving client packet: " + e.getMessage());			
+			System.exit(1);
+		}	
+		System.out.println("received client packet");
+		printOpcode(receivePacket);
 		
-		System.out.println();
-		System.out.println();
+		clientIP = receivePacket.getAddress();
+		clientPort = receivePacket.getPort();
 		
-		if (this.packetType == REQ) {
-			System.out.println();
-			System.out.println("Select type of error you wish to generate in the request packet:");
-			System.out.println("1) No Starting Zero");
-			System.out.println("2) Invalid Op Code");
-			System.out.println("3) No File Name");
-			System.out.println("4) No Zero After Filename");
-			System.out.println("5) No Mode");
-			System.out.println("6) Invalid Mode");
-			System.out.println("7) No Zero After Mode");
-			System.out.println("8) Data After Zero");
-			
-			for(;;) {
-				this.errorDetail = scanner.nextInt();
-				if (this.errorDetail>0 || this.errorDetail<=7) break;
-				System.out.println("Invalid option.  Please try again:");
-			}
-			error = new Error(PACKET, this.packetType, new Message(this.blockNumber),this.errorDetail);
-			
+		// check packet type
+		if (receivePacket.getData()[1] == 0x1) {
+			packetType = PacketType.RRQ;
+		} else if (receivePacket.getData()[1] == 0x2) {
+			packetType = PacketType.WRQ;
+		} else {
+			System.out.println("Wrong packet type received from client! (expected RRQ or WRQ)");
+			System.out.println("terminating simulation");
 			return;
 		}
 		
-		System.out.println("Please select a block number to trigger the error (Must be under 127): ");
-		for(;;) {
-			this.blockNumber = scanner.nextByte();
-			if (this.blockNumber>0) break;
-			System.out.println("Invalid block number selection.  Please try again:");
-		}
+		// pass request to server
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+				serverIP, SERVER_PORT);
 		
-		System.out.println();
-		System.out.println("Select type of error you wish to generate in the data packet:");
-		System.out.println("1) No Starting Zero");
-		System.out.println("2) Invalid Op Code");
-		System.out.println("3) Block Number Too High");
-		System.out.println("4) Block Number Too Low");
-		
-		for(;;) {
-			this.errorDetail = scanner.nextInt();
-			if (this.errorDetail>0 || this.errorDetail<=4) break;
-			System.out.println("Invalid option.  Please try again:");
+		// send new packet to server
+		try {
+			serverSendRecvSocket.send(sendPacket);
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(1);
 		}
-		error = new Error(PACKET, this.packetType, new Message(this.blockNumber),this.errorDetail);
-	}
-	
-	public DatagramSocket getClientFacingSocket() {
-		return sendReceieveSocket;
-	}
-	
 
-	
-	
-	
-	
-	public static void main( String args[] ) throws UnknownHostException
-	{
-		ErrorSimulator s = new ErrorSimulator();
-		Scanner scanner = new Scanner (System.in);
+		// receive server response
+		System.out.println("request passed on to server.");
+		System.out.println("waiting for server response...");
+		try {
+			serverSendRecvSocket.receive(receivePacket);
+		} catch (IOException e) {
+			System.out.println("IOException caught receiving server packet: " + e.getMessage());			
+			System.exit(1);
+		}	
+		System.out.println("received server packet");
+		printOpcode(receivePacket);
 		
-		for(;;){
-			System.out.println("Error mode setup:");
-			s.setupErrorMode(scanner);
-			ErrorSimCreator thread = null;
-			try {
-				thread = new ErrorSimCreator(s.getClientFacingSocket(), s.FormPacket(),s.error);
-			} catch (java.rmi.UnknownHostException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			Thread connect = new Thread (thread);
-	        connect.start();
+		// save the server's TID for this simulation
+		int serverTID = receivePacket.getPort();
+		
+		// pass server response to client, establish server TID
+		DatagramSocket clientSendRecvSocket = null;
+		try {
+			clientSendRecvSocket = new DatagramSocket();
+		} catch (SocketException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
 		}
+
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
+
+		System.out.println("sending server response to client...");
+		try {
+			clientSendRecvSocket.send(sendPacket);
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+		
+		// get first client DATA / ACK
+		System.out.println("waiting for client packet...");
+		try {
+			clientSendRecvSocket.receive(receivePacket);
+		} catch (IOException e) {
+			System.out.println("IOException caught receiving client packet: " + e.getMessage());			
+			System.exit(1);
+		}	
+		System.out.println("received client packet");
+		printOpcode(receivePacket);
+		
+		// create a new socket to generate TID error
+		DatagramSocket unknownTIDSocket = null;
+		try {
+			unknownTIDSocket = new DatagramSocket();
+		} catch (SocketException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+		sendPacket.setAddress(serverIP);
+		sendPacket.setPort(serverTID);
+		
+		// if server is receiving the unknown TID packet, then send this from the unknown TID socket
+		if (receiverProcess == ProcessType.SERVER) {
+			
+			try {
+				unknownTIDSocket.send(sendPacket);
+			} catch (IOException e) {
+				e.printStackTrace();
+				System.exit(1);			
+			}
+			
+			// receive server response (should be an ERROR with code 5)
+			System.out.println("waiting for ERROR packet from server...");
+			try {
+				unknownTIDSocket.receive(receivePacket);
+			} catch (IOException e) {
+				System.out.println("IOException caught receiving server packet: " + e.getMessage());			
+				System.exit(1);
+			}	
+			System.out.println("received server packet, checking contents");
+			printOpcode(receivePacket);
+			// check error code
+			
+		} else { // client is receiving unknown TID packet, send this out server socket
+			try {
+				serverSendRecvSocket.send(sendPacket);
+			} catch (IOException e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+		}
+		
+		// get server
+		
+		
+		
 	}
+
+	private void simulateIllegalOperation() {
+
+
+		//byte data[] = new byte[PacketUtil.BUF_SIZE];
+		byte data[] = new byte[BUF_SIZE];
+		receivePacket = new DatagramPacket(data, data.length);			
+		receivePacket.getLength();
+
+		// listen for a client packet
+		System.out.println("listening for client packet on port 68...");
+		try {
+			clientRecvSocket.receive(receivePacket);
+		} catch (IOException e) {
+			System.out.println("IOException caught receiving client packet: " + e.getMessage());			
+			System.exit(1);
+		}	
+		System.out.println("received client packet");
+		printOpcode(receivePacket);
+		
+		clientIP = receivePacket.getAddress();
+		clientPort = receivePacket.getPort();
+		// copy the data to a new packet
+
+		// if chosen packet type is request packet, need to make sure what was received matches
+		if (packetType == PacketType.RRQ) {
+			if (receivePacket.getData()[1] != 0x1) {
+				System.out.println("Wrong packet type received from client! (expected RRQ)");
+				System.out.println("terminating simulation");
+				return;
+			} else {
+				// received RRQ, now it must be modified to trigger illegal operation
+				sendPacket = getCorruptedPacket(receivePacket, illegalOpType);
+				sendPacket.setAddress(serverIP);
+				sendPacket.setPort(SERVER_PORT);
+			}
+
+		} else if (packetType == PacketType.WRQ) {
+			if (receivePacket.getData()[1] != 0x2) {
+				System.out.println("Wrong packet type received from client! (expected WRQ)");
+				System.out.println("terminating simulation");
+				return;
+			} else {
+				// received WRQ, now it must be modified to trigger illegal operation
+				sendPacket = getCorruptedPacket(receivePacket, illegalOpType);
+				sendPacket.setAddress(serverIP);
+				sendPacket.setPort(SERVER_PORT);
+			}
+		} else {
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, SERVER_PORT);
+		}
+
+		// send new packet to server
+
+		try {
+			serverSendRecvSocket.send(sendPacket);
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+
+		// receive server response
+		System.out.println("waiting for server response...");
+		try {
+			serverSendRecvSocket.receive(receivePacket);
+		} catch (IOException e) {
+			System.out.println("IOException caught receiving server packet: " + e.getMessage());			
+			System.exit(1);
+		}	
+		System.out.println("received server packet");
+		printOpcode(receivePacket);
+
+
+		// copy the data to a new packet
+
+		// set up a new socket to send to the client
+		DatagramSocket clientSendSocket = null;
+		try {
+			clientSendSocket = new DatagramSocket();
+		} catch (SocketException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
+
+		// send new packet to client
+		System.out.println("sending server response to client...");
+		try {
+			clientSendSocket.send(sendPacket);
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(1);
+		}
+
+		System.out.println("response sent - simulation complete.");
+		System.out.println("press any key to continue");
+		keyboard.nextLine(); 
+	}
+
+	private void getClientPacket() {
+		byte data[] = new byte[BUF_SIZE];
+		receivePacket = new DatagramPacket(data, data.length);			
+		receivePacket.getLength();
+
+		// listen for a client packet
+		System.out.println("listening for client packet on port 68...");
+		try {
+			clientRecvSocket.receive(receivePacket);
+		} catch (IOException e) {
+			System.out.println("IOException caught receiving client packet: " + e.getMessage());			
+			System.exit(1);
+		}	
+		System.out.println("received client packet");
+		printOpcode(receivePacket);
+	}
+
+	private static DatagramPacket getCorruptedPacket(DatagramPacket originalPacket, IllegalOperationType illegalOpType) {
+
+		byte[] newData = originalPacket.getData();
+		int newLength = originalPacket.getLength();
+
+		switch (illegalOpType) {
+		case OPCODE: // invalidate the opcode field
+			newData[0] = 0xf; // set the very first byte to non-zero
+			break;
+
+		case FILENAME: // invalidate the filename field (only for RRQ/WRQ)
+			// TODO: find a better way to invalidate text fields?
+			newData[2] = 0x1; // set the first filename byte to non-printable character
+			break;
+
+		case MODE: // invalidate the mode field (only for RRQ/WRQ)
+			// TODO: find a better way to invalidate text fields?
+			int index = getFilenameLength(newData) + 3; // get the index of the first mode character
+			newData[index] = 0x1; // set the first mode byte to non-printable character
+			break;
+
+		case BLOCKNUM: // invalidate the block number field (only for DATA/ACK)
+			// "invalid" block number depends on what the current block number is
+			// for now, just set it to zero - this is valid only for the first ACK in a WRQ
+			newData[2] = 0x0;
+			newData[3] = 0x0;
+			break;
+
+		case ERRCODE: // invalidate the error code field (only for ERROR)
+			newData[2] = 0xf; // set the first error code byte to non-zero 
+			break;
+
+		case ERRMSG: // invalidate the error message field (only for ERROR)
+			// TODO: find a better way to invalidate text fields?
+			newData[4] = 0x1; // set the first message byte to non-printable character
+			break;
+		
+		case LENGTH_TOO_SHORT:
+			newLength -= 2; // shorten the length by 2 bytes
+			break;
+		default:
+			break;			
+		}
+
+		DatagramPacket newPacket = new DatagramPacket(newData, newLength);
+		return newPacket;
+
+	}
+
+	/*
+	 * returns the length of a filename stored in a RRQ / WRQ packet's data
+	 */
+	private static int getFilenameLength (byte[] data) {
+
+		int length = 0;
+		for (int i = 2; i < data.length; i++) {
+			if (data[i] == 0)
+				length = i - 2;
+			break;
+		}
+
+		return length;
+	}
+
+	private void printOpcode(DatagramPacket packet) {
+		byte[] data = packet.getData();
+		System.out.printf("opcode: %02x %02x\n", data[0], data[1]);
+	}
+
+	private void quit() {
+		System.out.println("\n*** Exiting! ***");
+		closeResources();		
+		System.exit(0);
+	}
+	
+	private void closeResources() {
+		System.out.println("closing sockets");
+		clientRecvSocket.close();
+		serverSendRecvSocket.close();
+	}
+
+	public static void main(String args[]) {
+		ErrorSimulator sim = new ErrorSimulator();
+		try {
+			while (true) {
+				sim.showMainMenu();
+			}
+		} finally {
+			sim.closeResources();
+		}
+
+	}
+
 }
+

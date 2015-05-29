@@ -14,7 +14,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.SocketException;
 
-import tftp.Config;
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.InvalidRequestException;
 import tftp.exception.TFTPException;
@@ -28,6 +27,7 @@ import tftp.net.Receiver;
  */
 public class WriteHandlerThread extends WorkerThread {
 	
+	private String directory;
 	/**
 	 * Constructs a WriteHandlerThread. Passes the DatagramPacket argument to 
 	 * the WorkerThread constructor. 
@@ -36,6 +36,7 @@ public class WriteHandlerThread extends WorkerThread {
 	 */
 	public WriteHandlerThread(DatagramPacket reqPacket) {
 		super(reqPacket);
+		System.out.println("write handler thread");
 	}
 	
 	/**
@@ -58,26 +59,25 @@ public class WriteHandlerThread extends WorkerThread {
 			
 		} catch (TFTPPacketException e) {
 			
+			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 			
 			// send error packet
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
-				sendReceiveSocket.send(errPacket);			   
+				sendReceiveSocket.send(errPacket);			  
 			} catch (IOException ex) {	
-				System.out.printf("ERROR: IOException: %s\n", ex.getMessage());
-				return;
+				e.printStackTrace();
 			}
 			return;
 			
 		} catch (TFTPFileIOException e) {
 			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
-			
 			// send error packet to client
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {		
-				System.out.printf("ERROR: IOException: %s\n", ex.getMessage());
+			} catch (IOException ex) {	
+				ex.printStackTrace();
 				return;
 			}
 			return;
@@ -94,7 +94,6 @@ public class WriteHandlerThread extends WorkerThread {
 					sendReceiveSocket.send(errPacket);			   
 				} catch (IOException ex) {	
 					ex.printStackTrace();
-					System.out.printf("ERROR: IOException: %s\n", ex.getMessage());
 					return;
 				}
 			} else return;
@@ -117,9 +116,15 @@ public class WriteHandlerThread extends WorkerThread {
 			i++;
 		}
 		
-		String fullpath = Config.getServerDirectory() + filename;
+		try {
+			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\server\\ServerFiles")));
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	
+		File f = new File(getDirectory().concat("\\" + filename));
 		
-		File f = new File(fullpath);
 		if(f.exists() && !f.canWrite()){    // no write access
 
 			byte errorCode = 2;   //error code 2 : access violation
@@ -164,14 +169,12 @@ public class WriteHandlerThread extends WorkerThread {
 			System.exit(1);
 		}
 		
-		
+		System.out.println("seding ACK 0");
 		DatagramPacket initAck = packetUtil.formAckPacket(0);
-		
-		
 		try {
 			sendRecvSocket.send(initAck);
 		} catch (IOException e) {
-			System.out.printf("ERROR: IOException: %s\n", e.getMessage());
+			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -183,16 +186,24 @@ public class WriteHandlerThread extends WorkerThread {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
-		
 		Receiver r = new Receiver(sendRecvSocket, receivePacket.getPort());
 		try {
-			r.receiveFile(receivePacket, Config.getServerDirectory(), filename);
+			System.out.println("calling receiver.receiveFile()");
+			r.receiveFile(receivePacket, f);
 		} catch (TFTPException e) {
 			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 		} finally {		
 			cleanup();
 		}
 	}
+	
+	
+	//get functions
+	public String getDirectory(){
+		return directory;
+	}
+	
+	//set functions
+	public void setDirectory(String aDirectory){directory = aDirectory;}
 
 }

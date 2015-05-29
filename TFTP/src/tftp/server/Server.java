@@ -17,7 +17,6 @@ import java.net.SocketException;
 import java.util.HashSet;
 
 import tftp.exception.TFTPPacketException;
-import tftp.Config;
 import tftp.net.PacketUtil;
 import tftp.server.thread.WorkerThread;
 import tftp.server.thread.WorkerThreadFactory;
@@ -28,15 +27,16 @@ import tftp.server.thread.WorkerThreadFactory;
  *
  */
 public class Server {
+	
+	//private variables
 	private DatagramPacket receivePacket;
 	private DatagramSocket receiveSocket;
 	
 	private WorkerThreadFactory threadFactory;
 	private HashSet<WorkerThread> activatedThreads;
-	
 	private boolean acceptNewConnections;
 	private int threadCount;
-	private String mainDirectory;	
+	private String directory;	
 	
 	public Server()
 	{
@@ -48,11 +48,12 @@ public class Server {
 		}
 		
 		threadFactory = new WorkerThreadFactory();	
+		threadFactory = new WorkerThreadFactory();
 		
 		activatedThreads = new HashSet<WorkerThread>();
 		acceptNewConnections = true;
-		threadCount = 0;
-		mainDirectory = Config.getServerDirectory();
+		threadCount = 0;		
+		//mainDirectory = Config.getServerDirectory();
 	}
 
 	public void cleanup() {
@@ -73,7 +74,7 @@ public class Server {
 			} catch (IOException e) {
 				e.printStackTrace();
 				System.exit(1);
-			}			
+			}
 			
 			System.out.println( (String.format("Request received. Creating handler thread %d", threadCount)) );
 			// spawn a thread to process request
@@ -101,4 +102,9 @@ public class Server {
 		}
 	}
 	
+	//Server get functions
+	public String getDirectory(){return directory;}
+	
+	//Server set functions
+	public void setDirectory(String aDirectory){directory = aDirectory;}
 }

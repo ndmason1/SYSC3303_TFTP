@@ -13,9 +13,10 @@ import java.net.*;
 import java.util.*;
 import java.io.File;
 
-import tftp.Logger;
-import tftp.Util;
+import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
+import tftp.exception.TFTPFileIOException;
+import tftp.exception.TFTPPacketException;
 import tftp.server.thread.OPcodeError;
 
 public class Receiver
@@ -24,10 +25,10 @@ public class Receiver
 
 	private InetAddress senderIP;
 	private PacketUtil packetUtil;
-	private String Folder = System.getProperty("user.dir")+"/Client_files";
 	static String filename; 			//name of the file
+	private PacketParser packetParser;
 
-	public Receiver(DatagramSocket socket, int senderTID){		
+	public Receiver(DatagramSocket socket, int senderPort){		
 
 		try {
 			senderIP = InetAddress.getLocalHost();
@@ -36,13 +37,19 @@ public class Receiver
 			e.printStackTrace();
 		}
 
-		this.socket = socket;		
-		packetUtil = new PacketUtil(senderIP, senderTID);
+		this.socket = socket;	
+		packetUtil = new PacketUtil(senderIP, senderPort);
+		packetParser = new PacketParser(senderIP, senderPort);
+		
 	}
 
-	public void receiveFile(DatagramPacket initPacket, String directoryPath, String filename) throws TFTPException {
+	public void receiveFile(DatagramPacket initPacket, File aFile) throws TFTPException {
+		System.out.println("RECEIVER: top of receiveFile()");
 		
-		File theFile = new File(directoryPath+filename);
+		// parse the first DATA packet and see if we even need to set up 
+		
+		
+		File theFile = aFile;
 		FileOutputStream fileWriter = null;
 		try { // outer try with finally block so fileWriter gets closed
 
@@ -76,12 +83,11 @@ public class Receiver
 			data = new byte[PacketUtil.BUF_SIZE];
 			DatagramPacket receivePacket = new DatagramPacket(data, data.length);
 
-			int blockNum = packetUtil.parseDataPacket(initPacket);
-			System.out.println(String.format("DATA %d received", blockNum));
+			int blockNum = 1;
+			packetParser.parseDataPacket(initPacket, blockNum);
 
 			// send ACK for initial data packet
 			DatagramPacket sendPacket = packetUtil.formAckPacket(blockNum);
-			System.out.println(String.format("sending ACK %d", blockNum));
 
 			try {
 				socket.send(sendPacket);
@@ -104,6 +110,60 @@ public class Receiver
 				}
 				System.out.println(String.format("DATA %d received", blockNum));
 				
+				
+				// increment block number so we can check if received packet has expected block number
+				blockNum++;
+				
+				// parse the response packet to ensure it is correct before continuing
+				try {
+					System.out.println("RECEIVER: about to parse DATA packet with block number " + blockNum);
+					packetParser.parseDataPacket(receivePacket, blockNum);
+
+				} catch (TFTPPacketException e) {
+					e.printStackTrace();
+
+					// send error packet
+					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+					try {			   
+						socket.send(errPacket);			   
+					} catch (IOException ex) {			
+						ex.printStackTrace();
+						return;
+					}
+					return;
+
+				} catch (TFTPFileIOException e) {
+					e.printStackTrace();
+
+					// send error packet to client
+					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+					try {			   
+						socket.send(errPacket);			   
+					} catch (IOException ex) {		
+						ex.printStackTrace();
+						return;
+					}
+					return;
+
+				} catch (ErrorReceivedException e) {
+					// the client sent an error packet, so in most cases don't send a response
+					e.printStackTrace();
+
+					if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+						// send error packet to the unknown TID
+						DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+						try {			   
+							socket.send(errPacket);			   
+						} catch (IOException ex) {	
+							ex.printStackTrace();
+							return;
+						}
+					} else return;
+
+				} catch (TFTPException e) {
+					e.printStackTrace();
+					// this block shouldn't get executed, but needs to be here to compile
+				}
 				//Check if the disk is already full, If full generate Error code-3
 				//By Syed Taqi - 2015/05/08
 				if (theFile.getUsableSpace() < receivePacket.getLength()){				
@@ -168,11 +228,4 @@ public class Receiver
 			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 		}
 	}
-
-
-	public String getFolder(){
-		return Folder;
-	}
-
-
 }

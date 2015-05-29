@@ -12,7 +12,6 @@ import java.io.File;
 import java.io.IOException;
 import java.net.DatagramPacket;
 
-import tftp.Config;
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
 import tftp.exception.TFTPFileIOException;
@@ -31,6 +30,8 @@ public class ReadHandlerThread extends WorkerThread {
 	 *
 	 * @param  reqPacket  the packet containing the client's request
 	 */
+	private String directory; 
+	
 	public ReadHandlerThread(DatagramPacket reqPacket) {
 		super(reqPacket);
 	}	
@@ -53,9 +54,7 @@ public class ReadHandlerThread extends WorkerThread {
 			filename = packetParser.parseRRQPacket(reqPacket);
 			
 		} catch (TFTPPacketException e) {			
-			
 			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
-			
 			// send error packet
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
@@ -69,12 +68,11 @@ public class ReadHandlerThread extends WorkerThread {
 		} catch (TFTPFileIOException e) {
 			
 			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
-			
 			// send error packet to client
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {	
+			} catch (IOException ex) {
 				System.out.printf("ERROR: IOException: %s\n", ex.getMessage());
 				return;
 			}
@@ -102,12 +100,18 @@ public class ReadHandlerThread extends WorkerThread {
 			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 		}
 		
-		String fullpath = Config.getServerDirectory() + filename;
-		
+		try {
+			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\server\\ServerFiles")));
+		} catch (IOException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	
 		//\\//\\//\\ File Not Found - Error Code 1 //\\//\\//\\
 
 		//Opens an input stream
-		File f = new File(fullpath);
+		File f = new File(getDirectory().concat("\\" + filename));
+		
 		if(!f.exists()){    //file doesn't exist
 
 			byte errorCode = PacketUtil.ERR_FILE_NOT_FOUND;   //error code 1 : file not found
@@ -144,7 +148,7 @@ public class ReadHandlerThread extends WorkerThread {
 		// read request, so start a file transfer
 		Sender s = new Sender(sendReceiveSocket, clientPort);
 		try {			
-			s.sendFile(new File(fullpath));
+			s.sendFile(f);
 		} catch (TFTPException e) {
 			e.printStackTrace();
 			System.out.println("ERROR CODE " + e.getErrorCode());
@@ -154,5 +158,11 @@ public class ReadHandlerThread extends WorkerThread {
 		cleanup();
 
 	}
+
+	//get functions
+	public String getDirectory(){return directory;}
+	
+	//set functions
+	public void setDirectory(String aDirectory){directory = aDirectory;}
 
 }

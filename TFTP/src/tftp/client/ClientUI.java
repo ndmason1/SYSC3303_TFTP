@@ -34,7 +34,26 @@ public class ClientUI {
 	}
 	
 	public void showUI() {		
-		System.out.println("\nWelcome to the TFTP client. [v1.0 - LOCALHOST ONLY]");
+		System.out.println("\nWelcome to the TFTP client. [v1.1 - LOCALHOST ONLY]");
+		
+		boolean check = true;
+		
+		while (check){
+			System.out.println("Error Simulator on? yes/no?");
+			String errorSimulator = keyboard.nextLine();
+		
+			if (errorSimulator.toLowerCase().equals("yes") || errorSimulator.toLowerCase().equals("y"))
+			{
+				client.setPortNum(78);
+				check = false;
+			}
+			if (errorSimulator.toLowerCase().equals("no") || errorSimulator.toLowerCase().equals("n"))
+			{
+				client.setPortNum(69);
+				check = false;
+			}
+		}
+		
 		printHelp();
 				
 		while (true) {
@@ -54,28 +73,28 @@ public class ClientUI {
 	
 	private void printHelp() {
 		System.out.println("Please enter your file transfer request in the following format:\n");
-		System.out.println("  <absolute path of file location> <filename> <request type> <transfer mode>\n");
+		System.out.println("<filename> <request type> <transfer mode>\n");
 		System.out.println("Acceptable request types: 'r' (read) or 'w' (write)");
 		System.out.println("Acceptable transfer modes: 'n' (netascii - text files) or 'o' (octet - binary files)");
-		System.out.println("Example request (both forward slash or backslash path separator accepted):\n");
-		System.out.println("  C:/Users/User/ file.txt r o\n");
+		System.out.println("Example request :\n");
+		System.out.println("file.txt r o\n");
 		System.out.println("Press Q at any time to quit.\n");
 	}
 	
+	//Three different parameters expected
 	private void parseInput(String input) {
 		String[] args = input.split("\\s");
-		if (args.length < 4) {
+		if (args.length < 3) {
 			System.out.println("Not enough arguments.");
 			printHelp();
 			return;
 		}
 		
-		String path = args[0];
-		String filename = args[1];
-		String type = args[2].toLowerCase();
-		String mode = args[3].toLowerCase();
+		String filename = args[0];
+		String type = args[1].toLowerCase();
+		String mode = args[2].toLowerCase();
 		
-				
+		//Checks input of mode type
 		if (mode.equals("n")) {
 			mode = "netascii";
 		} else if (mode.equals("o")) {
@@ -86,52 +105,26 @@ public class ClientUI {
 			return;
 		}
 		
-		String fullpath = path;
-		// make sure the last character in the path is a separator
-		HashSet<Character> separators = new HashSet<Character>();
-		separators.add('/');
-		separators.add('\\');
-		if ( !separators.contains(path.charAt(path.length()-1)) ) {			
-			fullpath += File.separator;
-		}
-		fullpath += filename;
+		client.setFilename(filename);
+		client.setMode(mode);
+		client.retreiveFile();
 		
 		if (type.equals("r")) {
 			// read request
 			// check that the local (destination) file can be written to
 			try {
-				client.checkValidReadOperation(fullpath);
+				client.checkValidReadOperation();
 			} catch (TFTPException e) {
-				
-				if (e.getErrorCode() == PacketUtil.ERR_FILE_EXISTS) {					
-					// file exists on the local filesystem, so make sure the user really wants to overwrite
-					
-					while (true){					
-						System.out.println("Destination file on local filesystem already exists."); 
-						System.out.println("Do you want to replace it? (y/n)");
-						String userinput = keyboard.nextLine().toLowerCase();
-						if(userinput.equals("y")) {
-							new File(filename).delete();
-							break;
-						}
-						else if (userinput.equals("n")) {
-							System.out.println("Operation terminated.");
-							return;
-						}
-					}
-					
-				} else {					
-					System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
-					System.out.println(e.getMessage());
-				}
+				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
+				System.out.println(e.getMessage());
 			}
 			
 			// send the request
 			try {
-				client.sendReadRequest(fullpath, mode);	
+				client.sendReadRequest();	
 			} catch (ErrorReceivedException e) {
 				System.out.println("Error packet received from server!");
-				System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				return;
 			} catch (TFTPFileIOException e) {
 				System.out.println("Error: File IO exception from server");
@@ -147,16 +140,16 @@ public class ClientUI {
 				System.out.println(e.getMessage());
 				return;
 			}
-			System.out.printf("Read of file \"%s\" into directory \"%s\" finished.\n\n", filename, path);
+			System.out.println("Read of file " + client.getFilename() + " into directory " + client.getDirectory() + " finished.\n");
 			
 		} else if (type.equals("w")) {
 			// write request
 			// check that local (source) file exists and can be read from
 			try {
-				client.checkValidWriteOperation(fullpath);			
+				client.checkValidWriteOperation();			
 			} catch (ErrorReceivedException e) {
 				System.out.println("Error packet received from server!");
-				System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				return;
 			} catch (TFTPFileIOException e) {
 				System.out.println("Error: File IO exception from server");
@@ -167,18 +160,18 @@ public class ClientUI {
 				System.out.println(e.getMessage());
 				return;			
 			} catch (TFTPException e) {
-				System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				return;
 			}
 			
 			try{
-			    client.sendWriteRequest(fullpath, mode);
+			    client.sendWriteRequest();
 			}catch (TFTPException e){
-				System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				return;
 			}
 			
-			System.out.printf("Write of file \"%s\" from directory \"%s\" finished.\n\n", filename, path);
+			System.out.println("Read of file " + client.getFilename() + " into directory " + client.getDirectory() + " finished.\n");
 		} else {
 			System.out.println("Invalid request type.");
 			printHelp();
@@ -192,13 +185,12 @@ public class ClientUI {
 	}
 	
 	public static void main(String args[]) {
-		//Logger.getInstance().setLabel("client");
+
 		ClientUI ui = new ClientUI(); 
 		try {
 			ui.showUI();
 		} finally {
 			ui.cleanup();
-			//Logger.getInstance().flushMessages();
 		}
 	}
 

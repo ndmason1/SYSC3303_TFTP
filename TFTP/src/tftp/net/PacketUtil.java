@@ -162,8 +162,7 @@ public class PacketUtil {
 			sb.append((char)data[i]);
 			// reject non-printable values
 			if (data[i] < 0x20 || data[i] > 0x7F)
-				throw new TFTPPacketException(
-						String.format("non-printable data inside error message: byte %d",i), PacketUtil.ERR_ILLEGAL_OP);			
+				throw new TFTPPacketException("non-printable data inside error message: byte " + i, PacketUtil.ERR_ILLEGAL_OP);			
 			i++;
 		}
 		String msg = sb.toString();
@@ -186,9 +185,9 @@ public class PacketUtil {
 	public static void main(String args[]) {
 		int blockNum = 0;
 		byte[] bytes = PacketUtil.getBlockNumberBytes(blockNum);
-		System.out.printf("%02x %02x\n", bytes[0], bytes[1]);
+		System.out.println(Integer.toHexString(bytes[0] & 0xFF) + " " + Integer.toHexString(bytes[1] & 0xFF));
 		int newNum = PacketUtil.getBlockNumberInt(bytes[0], bytes[1]);
-		System.out.printf("%d\n", newNum);
+		System.out.println(newNum);
 	}
 
 }
