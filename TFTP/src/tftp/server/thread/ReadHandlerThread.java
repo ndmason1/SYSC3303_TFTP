@@ -31,7 +31,7 @@ public class ReadHandlerThread extends WorkerThread {
 	private String directory; 
 	
 	public ReadHandlerThread(DatagramPacket reqPacket) {
-		super(reqPacket);
+		super("ReadHandler-" + id++, reqPacket);
 	}	
 
 	/**
@@ -41,7 +41,7 @@ public class ReadHandlerThread extends WorkerThread {
 	@Override
 	public void run() {
 		
-		System.out.println("Started read handler thread");
+		printToConsole("processing request");
 		
 		byte[] data = reqPacket.getData();
 		PacketUtil packetUtil = new PacketUtil(reqPacket.getAddress(), reqPacket.getPort());
@@ -50,13 +50,14 @@ public class ReadHandlerThread extends WorkerThread {
 		// parse the request packet to ensure it is correct before starting the transfer
 		try {
 			filename = packetParser.parseRRQPacket(reqPacket);		
-		} catch (TFTPException e) {			
-			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+		} catch (TFTPException e) {
+			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 			// send error packet
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {	
+			} catch (IOException ex) {
+				printToConsole("IOException occured while attemping to send ERROR packet");
 				ex.printStackTrace();
 				cleanup();
 				return;
@@ -86,7 +87,8 @@ public class ReadHandlerThread extends WorkerThread {
 
 			try {			   
 				sendReceiveSocket.send(error);
-			} catch (IOException ex) {				
+			} catch (IOException ex) {
+				printToConsole("IOException occured while attemping to send ERROR packet");
 				ex.printStackTrace();
 				cleanup();
 				return;
@@ -105,7 +107,8 @@ public class ReadHandlerThread extends WorkerThread {
 
 			try {			   
 				sendReceiveSocket.send(error);			   
-			} catch (IOException ex) {			   
+			} catch (IOException ex) {
+				printToConsole("IOException occured while attemping to send ERROR packet");
 				ex.printStackTrace();
 				cleanup();
 				return;
@@ -117,11 +120,11 @@ public class ReadHandlerThread extends WorkerThread {
 		
 		// request is good if we made it here
 		// read request, so start a file transfer
-		Sender s = new Sender(sendReceiveSocket, clientPort);
+		Sender s = new Sender(this, sendReceiveSocket, clientPort);
 		try {			
 			s.sendFile(f);
 		} catch (TFTPException e) {
-			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 			cleanup();
 			return;
 		}

@@ -16,6 +16,7 @@ import java.io.File;
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
 import tftp.server.thread.OPcodeError;
+import tftp.server.thread.WorkerThread;
 
 public class Receiver
 {    
@@ -25,6 +26,8 @@ public class Receiver
 	private PacketUtil packetUtil;
 	static String filename; 			//name of the file
 	private PacketParser packetParser;
+	
+	private WorkerThread ownerThread = null; // whatever server thread is using this object
 
 	public Receiver(DatagramSocket socket, int senderPort){		
 
@@ -40,9 +43,15 @@ public class Receiver
 		packetParser = new PacketParser(senderIP, senderPort);
 		
 	}
+	
+	// extra constructor to allow the Receiver to print messages in the context of a server thread
+	public Receiver(WorkerThread ownerThread, DatagramSocket socket, int senderPort){
+		this(socket, senderPort);		
+		this.ownerThread = ownerThread;
+	}
 
 	public void receiveFile(DatagramPacket initPacket, File aFile) throws TFTPException {
-		System.out.println("RECEIVER: top of receiveFile()");
+		printToConsole("RECEIVER: top of receiveFile()");
 		
 		// parse the first DATA packet and see if we even need to set up 
 		
@@ -98,7 +107,7 @@ public class Receiver
 
 			while (!done) {
 				// wait for response
-				System.out.println("waiting for next DATA segment...");
+				printToConsole("waiting for next DATA segment...");
 				try {			  
 					socket.receive(receivePacket);
 					//
@@ -106,7 +115,7 @@ public class Receiver
 					ex.printStackTrace();
 					System.exit(1);
 				}
-				System.out.println(String.format("DATA %d received", blockNum));
+				printToConsole(String.format("DATA %d received", blockNum));
 				
 				
 				// increment block number so we can check if received packet has expected block number
@@ -114,7 +123,7 @@ public class Receiver
 				
 				// parse the response packet to ensure it is correct before continuing
 				try {
-					System.out.println("RECEIVER: about to parse DATA packet with block number " + blockNum);
+					printToConsole("RECEIVER: about to parse DATA packet with block number " + blockNum);
 					packetParser.parseDataPacket(receivePacket, blockNum);
 
 				} catch (ErrorReceivedException e) {
@@ -199,7 +208,7 @@ public class Receiver
 				blockNum = packetUtil.parseDataPacket(receivePacket);
 				// TODO verify block num
 				sendPacket = packetUtil.formAckPacket(blockNum);
-				System.out.println(String.format("sending ACK %d", blockNum));		
+				printToConsole(String.format("sending ACK %d", blockNum));		
 				
 
 				try {
@@ -210,7 +219,7 @@ public class Receiver
 					System.exit(1);
 				}
 			}
-			System.out.println("*** finished transfer ***");
+			printToConsole("*** finished transfer ***");
 		} finally {
 			closeFileWriter(fileWriter);
 		}
@@ -224,5 +233,12 @@ public class Receiver
 		} catch (IOException e) {
 			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 		}
+	}
+	
+	private void printToConsole(String message) {
+		if (ownerThread != null) // server thread owns this object
+			System.out.printf("%s: %s\n", ownerThread.getName(), message);
+		else // client owns this object
+			System.out.printf("%s\n", message);
 	}
 }

@@ -24,7 +24,9 @@ import tftp.net.Receiver;
  */
 public class WriteHandlerThread extends WorkerThread {
 	
-	private String directory;
+	private String directory;	
+	
+	
 	/**
 	 * Constructs a WriteHandlerThread. Passes the DatagramPacket argument to 
 	 * the WorkerThread constructor. 
@@ -32,8 +34,7 @@ public class WriteHandlerThread extends WorkerThread {
 	 * @param  reqPacket  the packet containing the client's request
 	 */
 	public WriteHandlerThread(DatagramPacket reqPacket) {
-		super(reqPacket);
-		System.out.println("write handler thread");
+		super("WriteHandler-" + id++, reqPacket);
 	}
 	
 	/**
@@ -56,9 +57,9 @@ public class WriteHandlerThread extends WorkerThread {
 			
 		} catch (ErrorReceivedException e) {
 			// the other side sent an error packet, so in most cases don't send a response
-			
-			System.out.println("ERROR packet received from Client!");
-			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+						
+			printToConsole("ERROR packet received from Client!");
+			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 
 			// we could have gotten an error packet from an unknown TID, so we need to respond to that TID
 			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
@@ -70,19 +71,19 @@ public class WriteHandlerThread extends WorkerThread {
 				try {			   
 					sendReceiveSocket.send(errPacket);
 				} catch (IOException ex) { 
-					System.out.println("Error occured sending ERROR packet to unknown TID");
+					printToConsole("Error occured sending ERROR packet to unknown TID");
 					ex.printStackTrace();
 					cleanup();
 					return;
 				}
 			}
 			
-			System.out.println("Write request cannot be processed, ending this thread");			
+			printToConsole("request cannot be processed, ending this thread");			
 			return;
 			
 		} catch (TFTPException e) {
 			
-			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 
 			// send error packet
 			DatagramPacket errPacket = null;
@@ -105,7 +106,7 @@ public class WriteHandlerThread extends WorkerThread {
 				return;
 			}
 			
-			System.out.println("Write request cannot be processed, ending this thread");			
+			printToConsole("request cannot be processed, ending this thread");			
 			return;
 		}	
 		
@@ -140,7 +141,7 @@ public class WriteHandlerThread extends WorkerThread {
 		try {
 			sendRecvSocket = new DatagramSocket();
 		} catch (SocketException se) {
-			System.out.println("Error occured creating socket for write request");
+			printToConsole("Error occured creating socket for write request");
 			se.printStackTrace();
 			cleanup();
 			return;
@@ -151,7 +152,7 @@ public class WriteHandlerThread extends WorkerThread {
 		try {
 			sendRecvSocket.send(initAck);
 		} catch (IOException e) {
-			System.out.println("Error occured sending ACK 0 packet");
+			printToConsole("Error occured sending ACK 0 packet");
 			e.printStackTrace();
 			cleanup();
 			return;
@@ -167,12 +168,12 @@ public class WriteHandlerThread extends WorkerThread {
 		}
 		
 		
-		Receiver r = new Receiver(sendRecvSocket, receivePacket.getPort());
+		Receiver r = new Receiver(this, sendRecvSocket, receivePacket.getPort());
 		try {
-			System.out.println("calling receiver.receiveFile()");
+			printToConsole("calling receiver.receiveFile()");
 			r.receiveFile(receivePacket, f);
 		} catch (TFTPException e) {
-			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 		} finally {		
 			cleanup();
 		}

@@ -15,12 +15,11 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
+import tftp.server.thread.WorkerThread;
 
 public class Sender {
 
@@ -30,6 +29,8 @@ public class Sender {
 	private InetAddress receiverIP;	
 	private PacketUtil packetUtil;	
 	private PacketParser parser;
+	
+	private WorkerThread ownerThread = null; // whatever server thread is using this object
 
 	public Sender(DatagramSocket socket, int receiverPort){
 
@@ -42,6 +43,12 @@ public class Sender {
 		this.socket = socket;		
 		packetUtil = new PacketUtil(receiverIP, receiverPort);
 		parser = new PacketParser(receiverIP, receiverPort);
+	}
+	
+	// extra constructor to allow the Receiver to print messages in the context of a server thread
+	public Sender(WorkerThread ownerThread, DatagramSocket socket, int senderPort){
+		this(socket, senderPort);		
+		this.ownerThread = ownerThread;
 	}
 
 	public void sendFile(File theFile) throws TFTPException {
@@ -78,7 +85,7 @@ public class Sender {
 			}
 			DatagramPacket sendPacket = packetUtil.formDataPacket(sendBuf, bytesRead, blockNum);
 
-			System.out.println(String.format("Sending DATA block %d with %d byte payload.", blockNum, bytesRead));
+			printToConsole(String.format("Sending DATA block %d with %d byte payload.", blockNum, bytesRead));
 
 			try {
 				socket.send(sendPacket);
@@ -89,7 +96,7 @@ public class Sender {
 			DatagramPacket reply = new DatagramPacket(recvBuf, recvBuf.length);
 
 			// expect an ACK from the other side
-			System.out.println(String.format("waiting for ACK %d", blockNum));
+			printToConsole(String.format("waiting for ACK %d", blockNum));
 			try {
 				socket.receive(reply);
 			} catch (IOException e) {
@@ -152,6 +159,13 @@ public class Sender {
 			blockNum++;
 
 		} while (!done);
+	}
+	
+	private void printToConsole(String message) {
+		if (ownerThread != null) // server thread owns this object
+			System.out.printf("%s: %s\n", ownerThread.getName(), message);
+		else // client owns this object
+			System.out.printf("%s\n", message);
 	}
 
 }

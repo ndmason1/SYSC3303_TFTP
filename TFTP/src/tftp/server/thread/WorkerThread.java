@@ -46,14 +46,18 @@ public abstract class WorkerThread extends Thread {
 	 * Port number of the client process.
 	 */
 	protected int clientPort;
+	
 	protected PacketParser packetParser;
+	
+	protected static int id = 1;
 	
 	/**
 	 * Constructs a WorkerThread. 
 	 *
 	 * @param  reqPacket  the packet containing the client's request
 	 */
-	protected WorkerThread(DatagramPacket reqPacket) {
+	protected WorkerThread(String name, DatagramPacket reqPacket) {
+		super(name);
 		this.reqPacket = reqPacket;
 		clientIP = reqPacket.getAddress();
 		clientPort = reqPacket.getPort();
@@ -73,6 +77,13 @@ public abstract class WorkerThread extends Thread {
 	 */
 	protected void cleanup() {
 		sendReceiveSocket.close();
+	}
+	
+	/**
+	 * Prints a message to standard output which is prepended with this thread's name.
+	 */
+	protected void printToConsole(String message) {
+		System.out.printf("%s: %s\n", this.getName(), message);
 	}
 	
 	/**
