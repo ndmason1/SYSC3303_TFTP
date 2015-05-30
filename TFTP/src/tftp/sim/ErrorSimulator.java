@@ -366,9 +366,7 @@ public class ErrorSimulator {
 			System.exit(1);
 		}
 
-		System.out.println("response sent - simulation complete.");
-		System.out.println("press any key to continue");
-		keyboard.nextLine();
+		printEndSimulation();
 	}
 	
 	private void simulateUnknownTID() {
@@ -517,9 +515,7 @@ public class ErrorSimulator {
 			}
 		}
 		
-		System.out.println("\nsimulation complete.");
-		System.out.println("press any key to continue");
-		keyboard.nextLine();
+		printEndSimulation();
 		
 	}
 
@@ -535,17 +531,7 @@ public class ErrorSimulator {
 		boolean startedWithRead = false; 
 
 		// listen for a client packet
-		receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, packetTypeSelection.name());
-//		
-//		System.out.printf("listening for client packet on port %d...", LISTEN_PORT);
-//		try {
-//			clientRecvSocket.receive(receivePacket);
-//		} catch (IOException e) {
-//			System.out.println("IOException caught receiving client packet: " + e.getMessage());			
-//			System.exit(1);
-//		}	
-//		System.out.println("received client packet");
-//		printOpcode(receivePacket);
+		receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "RRQ/WRQ");
 		
 		clientIP = receivePacket.getAddress();
 		clientPort = receivePacket.getPort();
@@ -561,7 +547,7 @@ public class ErrorSimulator {
 
 		// if chosen packet type is request packet, need to make sure what was received matches
 		if (packetTypeSelection == PacketType.RRQ) {
-			if (receivePacket.getData()[1] != 0x1) {
+			if (receivedPacketType != PacketType.RRQ) {
 				System.out.println("Wrong packet type received from client! (expected RRQ)");
 				System.out.println("terminating simulation");
 				return;
@@ -574,28 +560,11 @@ public class ErrorSimulator {
 				// send the modified packet
 				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "modified RRQ");
 				
-//				System.out.println("sending modified client packet to server...");				
-//				try {
-//					serverSendRecvSocket.send(sendPacket);
-//				} catch (IOException e) {
-//					e.printStackTrace();
-//					System.exit(1);
-//				}
-				
 				// receive response (should be ERROR)
 				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ERROR (4)");
-//				System.out.println("waiting for server response (expecting ERROR code 4)");
-//				try {
-//					serverSendRecvSocket.receive(receivePacket);
-//				} catch (IOException e) {
-//					e.printStackTrace();
-//					System.exit(1);
-//				}
-//				System.out.println("server packet received");
-//				printOpcode(receivePacket);
 				
 				// check to see if server response is correct				
-				if (receivePacket.getData()[1] == PacketUtil.ERROR_FLAG) {
+				if (receivedPacketType == PacketType.ERROR) {
 
 					if (receivePacket.getData()[3] == PacketUtil.ERR_ILLEGAL_OP) {
 						String msg = getErrMessage(receivePacket.getData());
@@ -618,23 +587,15 @@ public class ErrorSimulator {
 				sendPacket.setPort(clientPort);
 				
 				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK/ERROR");
-//				
-//				try {
-//					clientSendRecvSocket.send(sendPacket);
-//				} catch (IOException e) {
-//					e.printStackTrace();
-//					System.exit(1);
-//				}
 				
 				// end simulation
-				System.out.println("simulation complete.");
-				System.out.println("press any key to continue");
-				keyboard.nextLine(); 
+				printEndSimulation();
 				return;
 			}
 
 		} else if (packetTypeSelection == PacketType.WRQ) {
-			if (receivePacket.getData()[1] != 0x2) {
+			
+			if (receivedPacketType != PacketType.WRQ) {				
 				System.out.println("Wrong packet type received from client! (expected WRQ)");
 				System.out.println("terminating simulation");
 				return;
@@ -645,28 +606,13 @@ public class ErrorSimulator {
 				sendPacket.setPort(SERVER_PORT);
 				
 				// send the modified packet
-				sendPacketToProcess(serverSendRecvSocket, ProcessType.CLIENT, "modified");
-				
-				System.out.println("sending modified client packet to server...");				
-				try {
-					serverSendRecvSocket.send(sendPacket);
-				} catch (IOException e) {
-					e.printStackTrace();
-					System.exit(1);
-				}
-				
+				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "modified WRQ");
+								
 				// receive response (should be ERROR)
-				System.out.println("waiting for server response (expecting ERROR code 4)");
-				try {
-					serverSendRecvSocket.receive(receivePacket);
-				} catch (IOException e) {
-					e.printStackTrace();
-					System.exit(1);
-				}
-				printOpcode(receivePacket);
-				
+				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ERROR (4)");
+								
 				// check to see if server response is correct				
-				if (receivePacket.getData()[1] == PacketUtil.ERROR_FLAG) {
+				if (receivedPacketType != PacketType.ERROR) {
 
 					if (receivePacket.getData()[3] == PacketUtil.ERR_ILLEGAL_OP) {
 						String msg = getErrMessage(receivePacket.getData());
@@ -682,22 +628,15 @@ public class ErrorSimulator {
 					System.out.println("Server response was not an ERROR packet as expected [FAIL]"); 
 				}
 				
-				System.out.println("passing server response to client...");
+								
 				// pass server response to client
 				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
 				sendPacket.setAddress(clientIP);
-				sendPacket.setPort(clientPort);
-				try {
-					clientSendRecvSocket.send(sendPacket);
-				} catch (IOException e) {
-					e.printStackTrace();
-					System.exit(1);
-				}
+				sendPacket.setPort(clientPort);				
+				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
 				
 				// end simulation
-				System.out.println("simulation complete.");
-				System.out.println("press any key to continue");
-				keyboard.nextLine(); 
+				printEndSimulation(); 
 				return;
 				
 			}
@@ -791,9 +730,7 @@ public class ErrorSimulator {
 			}
 			
 			// end simulation
-			System.out.println("simulation complete.");
-			System.out.println("press any key to continue");
-			keyboard.nextLine(); 
+			printEndSimulation(); 
 			return;
 			
 		} 
@@ -810,9 +747,7 @@ public class ErrorSimulator {
 			System.exit(1);
 		}
 
-		System.out.println("simulation complete.");
-		System.out.println("press any key to continue");
-		keyboard.nextLine(); 
+		printEndSimulation();
 	}
 
 	private static DatagramPacket getCorruptedPacket(DatagramPacket originalPacket, IllegalOperationType illegalOpType) {
@@ -977,6 +912,12 @@ public class ErrorSimulator {
 			// only genuine network errors will cause this
 			return null; 
 		}
+	} 
+	
+	private void printEndSimulation() {
+		System.out.println("\nsimulation complete.");
+		System.out.println("press enter to continue");
+		keyboard.nextLine(); 
 	}
 
 	public static void main(String args[]) {
