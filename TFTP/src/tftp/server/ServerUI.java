@@ -33,7 +33,6 @@ public class ServerUI {
 			{
 				System.out.println("\nFinishing remaining transfers and terminating...");
 				st.shutdown();
-				//System.exit(0);
 			}
 		
 	}

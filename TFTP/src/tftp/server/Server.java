@@ -56,6 +56,7 @@ public class Server {
 	}
 
 	public void cleanup() {
+		// close the socket
 		receiveSocket.close();
 	}
 
@@ -66,11 +67,16 @@ public class Server {
 			receivePacket = new DatagramPacket(data, data.length);			
 			receivePacket.getLength();
 
-			// wait for request to come  in
+			// wait for request to come in
 			try {
 				receiveSocket.receive(receivePacket);
 				
+			} catch (SocketException e) { 
+				// likely the socket was closed because the server is shutting down
+				System.out.println("Stopped listening on port 69.");
+				
 			} catch (IOException e) {
+				System.out.println("IOexception listening for packets in main server thread");
 				e.printStackTrace();
 				System.exit(1);
 			}
@@ -88,17 +94,18 @@ public class Server {
 		}
 	}
 
-	// TODO: better way to stop threads, likely using interrupt()
+	
 	public void finishProcessing() {
 		acceptNewConnections = false;
-		for (Thread t : activatedThreads) {
+		for (Thread t : activatedThreads) {			
 			try {
+				// wait for threads to finish - those blocked while waiting to receive packet should time out
 				t.join();
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				System.out.printf("Thread %s was interrupted and did not finish processing\n", t.getName());				
 			}
 		}
+		cleanup();
 	}
 	
 	//Server get functions
