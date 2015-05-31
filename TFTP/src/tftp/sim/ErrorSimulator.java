@@ -143,12 +143,12 @@ public class ErrorSimulator {
 		if (receiverProcessSelection == ProcessType.SERVER) {
 			System.out.println("(1) RRQ");
 			System.out.println("(2) WRQ");
-			System.out.println("(3) DATA");
-			System.out.println("(4) ACK");
+			System.out.println("(3) DATA (must start with WRQ)");
+			System.out.println("(4) ACK (must start with RRQ)");
 			System.out.println("(5) ERROR");
 		} else {
-			System.out.println("(1) DATA");
-			System.out.println("(2) ACK");
+			System.out.println("(1) DATA (must start with RRQ)");
+			System.out.println("(2) ACK (must start with WRQ)");
 			System.out.println("(3) ERROR");
 		}
 			
@@ -272,14 +272,12 @@ public class ErrorSimulator {
 			}			
 		}
 
-		System.out.println("\nChosen parameters: ");
+		System.out.println("\nChosen parameters for illegal operation simulation: ");
 		System.out.println("Process to receive error: " + receiverProcessSelection.name());
 		System.out.println("Packet type to modify: " + packetTypeSelection.name());
 		System.out.println("Packet field/property to modify: " + illegalOpTypeSelection.name());
 		System.out.println("\n");
-
-		System.out.println("==== EXECUTING SIMULATION ====");
-
+		
 		simulateIllegalOperation();
 	}
 
@@ -299,77 +297,52 @@ public class ErrorSimulator {
 	}
 
 	private void relayRequestWithoutErrors() {	
-		System.out.println("No error mode selected.\n");
+		System.out.println("No error mode selected.");
+		System.out.println("Packets received from client will be forwarded to server, and vice versa.\n");
 
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
 		receivePacket = new DatagramPacket(data, data.length);			
 		receivePacket.getLength();
 
 		// listen for a client packet
-		System.out.println("listening for client packet on port 68...");
-		try {
-			clientRecvSocket.receive(receivePacket);
-		} catch (IOException e) {
-			System.out.println("IOException caught receiving client packet: " + e.getMessage());			
-			System.exit(1);
-		}	
-		System.out.println("received client packet");
-		printOpcode(receivePacket);
-
+		receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "RRQ/WRQ");
 
 		clientIP = receivePacket.getAddress();
 		clientPort = receivePacket.getPort();
-		// copy the data to a new packet
-
+		
+		// forward request to server
 		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, SERVER_PORT);
-
-		// send new packet to server
-
-		try {
-			serverSendRecvSocket.send(sendPacket);
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.exit(1);
-		}
+		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
 
 		// receive server response
 		System.out.println("waiting for server response...");
+		receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK/ERROR");
+		
+		// save port of server thread handling this request 
+		int serverTID = receivePacket.getPort();	
+
+		// set up a new socket to use for sending DATA/ACK to the client (act as server thread)
+		DatagramSocket clientSendRecvSocket = null;
 		try {
-			serverSendRecvSocket.receive(receivePacket);
-		} catch (IOException e) {
-			System.out.println("IOException caught receiving server packet: " + e.getMessage());			
-			System.exit(1);
-		}	
-		System.out.println("received server packet");
-		printOpcode(receivePacket);
-
-
-		// copy the data to a new packet
-
-		// set up a new socket to send to the client
-		DatagramSocket clientSendSocket = null;
-		try {
-			clientSendSocket = new DatagramSocket();
+			clientSendRecvSocket = new DatagramSocket();
 		} catch (SocketException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-
+				
 		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
 
-		// send new packet to client
-		System.out.println("sending server response to client...");
-		try {
-			clientSendSocket.send(sendPacket);
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.exit(1);
-		}
+		// forward response to client		
+		sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+		
+		// carry out rest of transfer - first process supplied is the receiving process, so client
+		finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+				ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
 
 		printEndSimulation();
 	}
 	
-	private void simulateUnknownTID() {
+	private void simulateUnknownTID() {		
 		
 		// TODO add expected packet enforcement so different packet types can be tested definitively
 		
@@ -387,6 +360,8 @@ public class ErrorSimulator {
 			System.out.println("If RRQ is made, Server will receive ACK 1 from unknown TID");
 			System.out.println("If WRQ is made, Server will receive DATA 1 from unknown TID");
 		}
+		
+		System.out.println("\n==== EXECUTING SIMULATION ====\n");
 		
 		byte data[] = new byte[PacketUtil.BUF_SIZE];
 		receivePacket = new DatagramPacket(data, data.length);
@@ -416,11 +391,11 @@ public class ErrorSimulator {
 		receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK/ERROR");
 		
 		// maybe ERROR should be allowed here...
-		if (isErrorPacket(receivePacket)) {
-			System.out.println("unexpected ERROR packet received from client! [FAIL]");
-			System.out.println("terminating simulation");
-			return;
-		}
+//		if (isErrorPacket(receivePacket)) {
+//			System.out.println("unexpected ERROR packet received from client! [FAIL]");
+//			System.out.println("terminating simulation");
+//			return;
+//		}
 		
 		// save the server's TID for this simulation
 		int serverTID = receivePacket.getPort();
@@ -435,7 +410,7 @@ public class ErrorSimulator {
 		}
 
 		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
-		sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK/ERROR");
+		sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
 		
 		// get first client DATA / ACK		
 		receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK/ERROR");		
@@ -454,30 +429,18 @@ public class ErrorSimulator {
 		sendPacket.setPort(serverTID);		
 		
 		if (receiverProcessSelection == ProcessType.SERVER) {
-			System.out.println("sending client packet to server from unknown TID...");
+			System.out.println("[ next packet will be sent from unknown TID ]");
 			// server is receiving the unknown TID packet, send this from the unknown TID socket
-			sendPacketToProcess(unknownTIDSocket, ProcessType.SERVER, "DATA/ACK/ERROR");
+			sendPacketToProcess(unknownTIDSocket, ProcessType.SERVER, receivedPacketType.name());
 			
 			// receive server response (should be an ERROR with code 5)
 			receivePacketFromProcess(unknownTIDSocket, ProcessType.SERVER, "ERROR");
-						
-			if (receivePacket.getData()[1] == PacketUtil.ERROR_FLAG) {
-				
-				if (receivePacket.getData()[3] == PacketUtil.ERR_UNKNOWN_TID) {
-					String msg = getErrMessage(receivePacket.getData());
-					System.out.println("Server responded with ERROR code 5 as expected! [PASS]");
-					System.out.printf("error message from packet: \"%s\"", msg);
-				} else {
-					String msg = getErrMessage(receivePacket.getData());
-					System.out.printf("Server responded with ERROR code %d (not 5 as expected)", receivePacket.getData()[3]);
-					System.out.printf("error message from packet: \"%s\"", msg);
-				}
-				
-				
-			} else { // not an error packet
-				System.out.println("Server response was not an ERROR packet as expected [FAIL]"); 
-			}
 			
+			// check result and display
+			printSimulationResult(ProcessType.SERVER, PacketUtil.ERR_UNKNOWN_TID);
+			
+			// TODO finish transfer by sending packet from original client TID
+			// and finish remaining exchange
 			
 		} else { 
 			// client is receiving unknown TID packet, send this out server socket
@@ -497,22 +460,24 @@ public class ErrorSimulator {
 			// receive client response (should be an ERROR with code 5)
 			receivePacketFromProcess(unknownTIDSocket, ProcessType.CLIENT, "ERROR (5)");
 			
-			if (receivePacket.getData()[1] == PacketUtil.ERROR_FLAG) {
-
-				if (receivePacket.getData()[3] == PacketUtil.ERR_UNKNOWN_TID) {
-					String msg = getErrMessage(receivePacket.getData());
-					System.out.println("Client responded with ERROR code 5 as expected! [PASS]");
-					System.out.printf("error message from packet: \"%s\"\n", msg);
-				} else {
-					String msg = getErrMessage(receivePacket.getData());
-					System.out.printf("Client responded with ERROR code %d (not 5 as expected) [FAIL]\n", receivePacket.getData()[3]);
-					System.out.printf("error message from packet: \"%s\"\n", msg);
-				}
-
-
-			} else { // not an error packet
-				System.out.println("Client response was not an ERROR packet as expected [FAIL]"); 
-			}
+			// check result and display
+			printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_UNKNOWN_TID);
+//			if (receivedPacketType == PacketType.ERROR) {
+//
+//				if (receivePacket.getData()[3] == PacketUtil.ERR_UNKNOWN_TID) {
+//					String msg = getErrMessage(receivePacket.getData());
+//					System.out.println("Client responded with ERROR code 5 as expected! [PASS]");
+//					System.out.printf("error message from packet: \"%s\"\n", msg);
+//				} else {
+//					String msg = getErrMessage(receivePacket.getData());
+//					System.out.printf("Client responded with ERROR code %d (not 5 as expected) [FAIL]\n", receivePacket.getData()[3]);
+//					System.out.printf("error message from packet: \"%s\"\n", msg);
+//				}
+//
+//
+//			} else { // not an error packet
+//				System.out.println("Client response was not an ERROR packet as expected [FAIL]"); 
+//			}
 		}
 		
 		printEndSimulation();
@@ -520,6 +485,8 @@ public class ErrorSimulator {
 	}
 
 	private void simulateIllegalOperation() {
+		
+		System.out.println("==== EXECUTING SIMULATION ====");
 
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
 		receivePacket = new DatagramPacket(data, data.length);			
@@ -527,8 +494,8 @@ public class ErrorSimulator {
 		
 		// this variable is used to keep track of whether the client sent a RRQ or WRQ to start the exchange
 		// this is necessary because if packetType is DATA, ACK, or ERROR, we need to know which side is sending
-		// DATA packets and which side is sending ACK packets so we know which packet to modify
-		boolean startedWithRead = false; 
+		// DATA packets and which side is sending ACK packets so we know which packet to modify		 
+		PacketType startingRequestType;
 
 		// listen for a client packet
 		receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "RRQ/WRQ");
@@ -544,6 +511,14 @@ public class ErrorSimulator {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}		
+		
+		// make sure starting request type actually IS a request
+		startingRequestType = receivedPacketType;
+		if (startingRequestType != PacketType.RRQ && startingRequestType != PacketType.WRQ) {
+			System.out.println("Need to start with request packet");
+			System.out.println("terminating simulation");
+			return;
+		}
 
 		// if chosen packet type is request packet, need to make sure what was received matches
 		if (packetTypeSelection == PacketType.RRQ) {
@@ -551,7 +526,8 @@ public class ErrorSimulator {
 				System.out.println("Wrong packet type received from client! (expected RRQ)");
 				System.out.println("terminating simulation");
 				return;
-			} else {
+			} else {				
+				
 				// received RRQ, now it must be modified to trigger illegal operation
 				sendPacket = getCorruptedPacket(receivePacket, illegalOpTypeSelection);
 				sendPacket.setAddress(serverIP);
@@ -640,32 +616,17 @@ public class ErrorSimulator {
 				return;
 				
 			}
-		} else { // packetType is DATA, ACK, or ERROR
-			
-			// set startedWithRead so we know which side is sending DATA packets
-			startedWithRead = receivePacket.getData()[1] == PacketUtil.READ_FLAG;
+		} else { // packetTypeSelection is DATA, ACK, or ERROR
 			
 			// send request to server as normal
 			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, SERVER_PORT);
 		}
 		
-		try {
-			serverSendRecvSocket.send(sendPacket);
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.exit(1);
-		}
+		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
 
 		// receive first server response (DATA 1 if RRQ, ACK 0 if WRQ)
-		System.out.println("waiting for server response...");
-		try {
-			serverSendRecvSocket.receive(receivePacket);
-		} catch (IOException e) {
-			System.out.println("IOException caught receiving server packet: " + e.getMessage());			
-			System.exit(1);
-		}	
-		System.out.println("received server packet");
-		printOpcode(receivePacket);
+		String expectPacket = startingRequestType == PacketType.RRQ ? "DATA 1" : "ACK 0";
+		receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, expectPacket);
 		
 		// keep track of port being used by server thread
 		int serverTID = receivePacket.getPort();
@@ -676,33 +637,21 @@ public class ErrorSimulator {
 		// otherwise, pass response to client as normal
 		
 		if (receiverProcessSelection == ProcessType.CLIENT && (
-			(startedWithRead && packetTypeSelection == PacketType.DATA) || 
-			(!startedWithRead && packetTypeSelection == PacketType.ACK) ) ) {
+			(startingRequestType == PacketType.RRQ && packetTypeSelection == PacketType.DATA) || 
+			(startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.ACK) ) ) {
 			
 			sendPacket = getCorruptedPacket(receivePacket, illegalOpTypeSelection);
 			sendPacket.setAddress(clientIP);
 			sendPacket.setPort(clientPort);
 			
-			System.out.printf("sending modified %s packet to client...\n", packetTypeSelection.name());
-			try {
-				clientSendRecvSocket.send(sendPacket);
-			} catch (IOException e) {
-				e.printStackTrace();
-				System.exit(1);
-			}
+			// send modified packet
+			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "modified" + receivedPacketType.name());			
 			
-			System.out.println("waiting for response from client (expecting ERROR code 4)...");
-			try {
-				clientSendRecvSocket.receive(receivePacket);
-			} catch (IOException e) {
-				e.printStackTrace();
-				System.exit(1);
-			}
-			System.out.println("received client packet");
-			printOpcode(receivePacket);
+			// receive response, expecting ERROR 4
+			receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "ERROR (4)");
 			
-			// check to see if server response is correct				
-			if (receivePacket.getData()[1] == PacketUtil.ERROR_FLAG) {
+			// check to see if client response is correct				
+			if (receivedPacketType == PacketType.ERROR) {
 
 				if (receivePacket.getData()[3] == PacketUtil.ERR_ILLEGAL_OP) {
 					String msg = getErrMessage(receivePacket.getData());
@@ -855,8 +804,8 @@ public class ErrorSimulator {
 		
 		// listen for a packet from given source process
 		// note this function doesn't actually enforce the packet type received, since it might not always matter
-		System.out.printf("listening for %s packet from %s (IP: %s, UDP port %d)... ", expectedPacketStr, 
-				sendProcess, recvSocket.getLocalAddress(), recvSocket.getLocalPort());
+		System.out.printf("listening on UDP port %s for %s packet from %s ... ", recvSocket.getLocalPort(), 
+				expectedPacketStr, sendProcess);
 		try {
 			recvSocket.receive(receivePacket);
 		} catch (IOException e) {
@@ -889,6 +838,28 @@ public class ErrorSimulator {
 		printOpcode(sendPacket);
 	}
 	
+	private void printSimulationResult(ProcessType errorSource, byte expectedErrCode) {
+		
+		String srcProcName = errorSource.name().toLowerCase();
+		
+		if (receivedPacketType == PacketType.ERROR) {
+
+			if (receivePacket.getData()[3] == expectedErrCode) {
+				String msg = getErrMessage(receivePacket.getData());
+				System.out.printf("%s responded with ERROR code %d as expected! [PASS]\n", srcProcName, expectedErrCode);
+				System.out.printf("error message from packet: \"%s\"\n", msg);
+			} else {
+				String msg = getErrMessage(receivePacket.getData());
+				System.out.printf("%s responded with ERROR code %d (not %d as expected) [FAIL]\n", 
+						srcProcName, receivePacket.getData()[3], expectedErrCode);
+				System.out.printf("error message from packet: \"%s\"\n", msg);
+			}
+
+		} else { // not an error packet
+			System.out.printf("%s response was not an ERROR packet as expected [FAIL]\n", srcProcName); 
+		}
+	}
+	
 	private PacketType getPacketType(DatagramPacket packet) {
 		
 		switch (packet.getData()[1]) {
@@ -918,6 +889,98 @@ public class ErrorSimulator {
 		System.out.println("\nsimulation complete.");
 		System.out.println("press enter to continue");
 		keyboard.nextLine(); 
+	}
+	
+	// finish a file transfer by forwarding the packets between the client & server
+	// process A is the process whose "turn" it is to send a message
+	// process B is the other process
+	private void finishTransfer(ProcessType processA, DatagramSocket socketA, InetAddress addrA, int portA,
+					ProcessType processB, DatagramSocket socketB, InetAddress addrB, int portB) { 
+		
+		System.out.println("** FINISHING TRANSFER **");
+		
+		String expectPacketStr = "DATA/ACK/ERROR";		
+		
+		while (true) {
+			
+			// start by listening for a packet from the process whose "turn" it is
+			receivePacketFromProcess(socketA, processA, expectPacketStr);
+						
+			// send received packet to other side		
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+							addrB, portB);
+			sendPacketToProcess(socketB, processB, receivedPacketType.name());
+			
+			// check to see if the last packet sent will end the transfer
+			if (isTerminatingErrorPacket(receivePacket)) {
+				// the error packet was sent to the host and no response is expected
+				return;
+			} else if (isFinalDataPacket(receivePacket)) {
+				
+				// expect a final ACK, but could also be ERROR				
+				receivePacketFromProcess(socketB, processB, "ACK/ERROR");
+								
+				// pass on the ACK or ERROR
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+						addrA, portA);
+				sendPacketToProcess(socketA, processA, receivedPacketType.name());
+
+				// we're done
+				return;		
+			} 
+			
+			// last packet sent was not terminating error or final data, so do the same for process B
+						
+			receivePacketFromProcess(socketB, processB, expectPacketStr);
+			
+			// send received packet to other side		
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+							addrA, portA);
+			sendPacketToProcess(socketA, processA, receivedPacketType.name());
+			
+			// check to see if the last packet sent will end the transfer
+			if (isTerminatingErrorPacket(receivePacket)) {
+				// the error packet was sent to the host and no response is expected
+				return;
+			} else if (isFinalDataPacket(receivePacket)) {
+				
+				// expect a final ACK, but could also be ERROR				
+				receivePacketFromProcess(socketA, processA, "ACK/ERROR");
+								
+				// pass on the ACK or ERROR
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+						addrB, portB);
+				sendPacketToProcess(socketB, processB, receivedPacketType.name());
+
+				// we're done
+				return;		
+			}
+			
+			// still not the end of the transfer -> next loop iteration
+		}
+		
+	}
+	
+	// returns true if a DATA packet is the last one in a transfer, i.e. less than 512 bytes 
+	private boolean isFinalDataPacket(DatagramPacket packet) {
+		// return false if not a DATA packet 
+		if (getPacketType(packet) != PacketType.DATA)
+			return false;
+		
+		// check length including opcode and block number
+		return packet.getLength() < 516;
+	}
+	
+	// returns true if an ERROR packet will end a transfer once it is received
+	private boolean isTerminatingErrorPacket(DatagramPacket packet) {
+		// return false if not an ERROR packet 
+		if (getPacketType(packet) != PacketType.ERROR)
+			return false;
+		
+		byte errCode = packet.getData()[3];
+		
+		// return true for any error code except unknown TID
+		return errCode != PacketUtil.ERR_UNKNOWN_TID;
 	}
 
 	public static void main(String args[]) {

@@ -4,5 +4,12 @@ package tftp.sim;
 
 public enum ProcessType {
 	CLIENT, 
-	SERVER
+	SERVER;
+	
+	public static ProcessType getOther(ProcessType proc) {
+		if (proc == CLIENT)
+			return SERVER;
+		else
+			return CLIENT;
+	}
 }

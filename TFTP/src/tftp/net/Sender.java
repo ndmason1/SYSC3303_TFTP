@@ -75,7 +75,7 @@ public class Sender {
 			try {
 				bytesRead = fileReader.read(sendBuf);
 			} catch (IOException e) {
-				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+				throw new TFTPException("Error reading data from file: "+e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}
 			if (bytesRead == -1) {
 				bytesRead = 0;				
