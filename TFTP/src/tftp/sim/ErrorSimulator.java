@@ -11,13 +11,22 @@ import java.util.LinkedList;
 import java.util.Scanner;
 
 import tftp.net.PacketUtil;
+import tftp.server.Server;
 
+/**
+ * An ErrorSimulator acts as a man-in-the-middle between a TFTP server and client.
+ * It behaves like the server from the perspective of the client, and behaves like
+ * a client from the perspective of the server. It may run in several different modes
+ * to simulate network-related errors.
+ * 
+ *  Note that the Client must be run in the correct mode to communicate with the ErrorSimulator.
+ */
 public class ErrorSimulator {
 	
-	private static final int LISTEN_PORT = 78; // not using 68 due to its usage by windows DHCP service
-	private static final int SERVER_PORT = 69;
+	private static final int LISTEN_PORT = 78; // not using 68 due to its usage by windows DHCP service	
 
 	// sockets used for communicating with the client and server, respectively	
+	// new sockets
 	private DatagramSocket clientRecvSocket, serverSendRecvSocket;
 
 	// packet objects to use for sending and receiving messages
@@ -39,6 +48,10 @@ public class ErrorSimulator {
 	// keep track of type of last packet received
 	private PacketType receivedPacketType;
 
+	/**
+	 * Constructs an ErrorSimulator. 
+	 *
+	 */
 	public ErrorSimulator() {
 		try {
 			clientRecvSocket = new DatagramSocket(LISTEN_PORT);
@@ -67,6 +80,9 @@ public class ErrorSimulator {
 		}
 	}
 
+	/**
+	 * Starts the execution of an ErrorSimulator and displays the top level menu.
+	 */
 	public void showMainMenu() {
 		System.out.println("Please select the type of error to simulate: \n");		
 		System.out.println("(1) Illegal operation (TFTP error code 4)");
@@ -93,6 +109,9 @@ public class ErrorSimulator {
 		}
 	}
 
+	/**
+	 * Display a menu for the user to select which process receives a packet.
+	 */
 	private void showProcessMenu() {
 
 		// build message based on previous selection
@@ -130,6 +149,10 @@ public class ErrorSimulator {
 		}
 	}
 
+	/**
+	 * Displays a menu for the user to select a type of packet that should be modified.
+	 * Currently only used for illegal operation mode.
+	 */
 	private void showPacketTypeMenu() {
 
 		// build message based on previous selection
@@ -191,6 +214,10 @@ public class ErrorSimulator {
 		showIllegalOpTypeMenu();
 	}
 
+	/**
+	 * Displays a menu for the user to select a method of modifying a packet
+	 * so that its recipient triggers an illegal operation error.
+	 */
 	private void showIllegalOpTypeMenu() {
 
 		// build message based on previous selection
@@ -281,6 +308,9 @@ public class ErrorSimulator {
 		simulateIllegalOperation();
 	}
 
+	/**
+	 * Utility function for getting a user's menu selection.
+	 */
 	private int getInput() {
 
 		String input = null;
@@ -295,7 +325,10 @@ public class ErrorSimulator {
 
 		return Integer.parseInt(input);
 	}
-
+	
+	/**
+	 * Runs "No error" mode. Just lets a file transfer proceed as normal.
+	 */
 	private void relayRequestWithoutErrors() {	
 		System.out.println("No error mode selected.");
 		System.out.println("Packets received from client will be forwarded to server, and vice versa.\n");
@@ -311,7 +344,7 @@ public class ErrorSimulator {
 		clientPort = receivePacket.getPort();
 		
 		// forward request to server
-		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, SERVER_PORT);
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);
 		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
 
 		// receive server response
@@ -342,6 +375,13 @@ public class ErrorSimulator {
 		printEndSimulation();
 	}
 	
+	/**
+	 * Runs "Unknown TID" mode. 
+	 * A packet's contents are not modified, but it is sent from a different socket so as to trigger
+	 * an "Unknown TID" (transfer ID) error.
+	 * The packet selected to trigger the error depends on whether the client sends a RRQ or WRQ to
+	 * start the simulation and the process chosen to receive the packet with unknown TID.
+	 */
 	private void simulateUnknownTID() {		
 		
 		// TODO add expected packet enforcement so different packet types can be tested definitively
@@ -382,7 +422,7 @@ public class ErrorSimulator {
 		
 		// pass request to server (establish client TID to the server)
 		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
-				serverIP, SERVER_PORT);
+				serverIP, Server.SERVER_PORT);
 		
 		// send new packet to server
 		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
@@ -462,28 +502,20 @@ public class ErrorSimulator {
 			
 			// check result and display
 			printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_UNKNOWN_TID);
-//			if (receivedPacketType == PacketType.ERROR) {
-//
-//				if (receivePacket.getData()[3] == PacketUtil.ERR_UNKNOWN_TID) {
-//					String msg = getErrMessage(receivePacket.getData());
-//					System.out.println("Client responded with ERROR code 5 as expected! [PASS]");
-//					System.out.printf("error message from packet: \"%s\"\n", msg);
-//				} else {
-//					String msg = getErrMessage(receivePacket.getData());
-//					System.out.printf("Client responded with ERROR code %d (not 5 as expected) [FAIL]\n", receivePacket.getData()[3]);
-//					System.out.printf("error message from packet: \"%s\"\n", msg);
-//				}
-//
-//
-//			} else { // not an error packet
-//				System.out.println("Client response was not an ERROR packet as expected [FAIL]"); 
-//			}
+			
 		}
 		
 		printEndSimulation();
 		
 	}
 
+	/**
+	 * Runs "Illegal Operation" mode. 
+	 * A packet's contents are modified so as to trigger an Illegal Operation error.
+	 * The packet selected to trigger the error is determined based on the user's
+	 * selection of packet type to modify and the process who is reciveing the 
+	 * modified packet. 
+	 */
 	private void simulateIllegalOperation() {
 		
 		System.out.println("==== EXECUTING SIMULATION ====");
@@ -531,7 +563,7 @@ public class ErrorSimulator {
 				// received RRQ, now it must be modified to trigger illegal operation
 				sendPacket = getCorruptedPacket(receivePacket, illegalOpTypeSelection);
 				sendPacket.setAddress(serverIP);
-				sendPacket.setPort(SERVER_PORT);
+				sendPacket.setPort(Server.SERVER_PORT);
 				
 				// send the modified packet
 				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "modified RRQ");
@@ -579,7 +611,7 @@ public class ErrorSimulator {
 				// received WRQ, now it must be modified to trigger illegal operation
 				sendPacket = getCorruptedPacket(receivePacket, illegalOpTypeSelection);
 				sendPacket.setAddress(serverIP);
-				sendPacket.setPort(SERVER_PORT);
+				sendPacket.setPort(Server.SERVER_PORT);
 				
 				// send the modified packet
 				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "modified WRQ");
@@ -619,7 +651,7 @@ public class ErrorSimulator {
 		} else { // packetTypeSelection is DATA, ACK, or ERROR
 			
 			// send request to server as normal
-			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, SERVER_PORT);
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);
 		}
 		
 		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
@@ -699,6 +731,14 @@ public class ErrorSimulator {
 		printEndSimulation();
 	}
 
+	/**
+	 * Utility function to return a packet that has been modified to trigger an
+	 * illegal operation error.
+	 * 
+	 *  @param originalPacket	the packet to be modified
+	 *  @param illegalOpType	the method of modification
+	 *  @return 				a modified DatagramPacket
+	 */
 	private static DatagramPacket getCorruptedPacket(DatagramPacket originalPacket, IllegalOperationType illegalOpType) {
 
 		byte[] newData = originalPacket.getData();
@@ -748,8 +788,11 @@ public class ErrorSimulator {
 
 	}
 
-	/*
-	 * returns the length of a filename stored in a RRQ / WRQ packet's data
+	/**
+	 * Utility function to return the length of a filename contained in a RRQ or WRQ packet.
+	 * 
+	 *  @param data		the contents of a request packet
+	 *  @return 		the length of the string
 	 */
 	private static int getFilenameLength (byte[] data) {
 
@@ -764,8 +807,11 @@ public class ErrorSimulator {
 		return length;
 	}
 	
-	/*
-	 * returns the message from an ERROR packet
+	/**
+	 * Utility function to return the error message contained in an ERROR packet.
+	 * 
+	 *  @param data		the contents of an ERROR packet
+	 *  @return 		the error message
 	 */
 	private static String getErrMessage(byte[] data) {
 
@@ -780,26 +826,52 @@ public class ErrorSimulator {
 		return sb.toString();
 	}
 
+	/**
+	 * Utility function to display the opcode of a TFTP packet.
+	 * 
+	 *  @param packet	the packet
+	 */
 	private void printOpcode(DatagramPacket packet) {
 		byte[] data = packet.getData();
 		System.out.printf("[opcode: %02x]\n", data[1]);
 	}
 	
+	/**
+	 * Utility function to check if a packet is an ERROR packet.
+	 * 
+	 *  @param packet	the packet
+	 *  @return			true if ERROR packet
+	 */
 	private boolean isErrorPacket(DatagramPacket packet) {
 		return packet.getData()[1] == PacketUtil.ERROR_FLAG;
 	}
 
+	/**
+	 * Terminate the ErrorSimulator's execution. 
+	 */
 	private void quit() {
 		System.out.println("\n*** Exiting! ***");
 		closeResources();		
 		System.exit(0);
 	}
 	
+	/**
+	 * Close instance sockets. 
+	 */
 	private void closeResources() {
 		clientRecvSocket.close();
 		serverSendRecvSocket.close();
 	}
 	
+	/**
+	 * Listens for a packet from the given process and displays information.
+	 * Sets receivedPacket and receivedPacketType to the packet that was 
+	 * received and its type, respectively.
+	 * 
+	 *  @param recvSocket			the DatagramSocket to listen on
+	 *  @param sendProcess			the process (client or server) expected to send a packet
+	 *  @param expectedPacketStr	a string describing the expected type of packet to receive, which is displayed
+	 */
 	private void receivePacketFromProcess(DatagramSocket recvSocket, ProcessType sendProcess, String expectedPacketStr) {
 		
 		// listen for a packet from given source process
@@ -818,6 +890,14 @@ public class ErrorSimulator {
 		printOpcode(receivePacket);
 	}
 	
+	/**
+	 * Sends a packet to the given process and displays information.
+	 * 
+	 * 
+	 *  @param sendSocket		the DatagramSocket to listen on
+	 *  @param recvProcess		the process (client or server) who should be listening for the packet
+	 *  @param sendPacketStr	a string describing the packet being sent, which is displayed
+	 */
 	private void sendPacketToProcess(DatagramSocket sendSocket, ProcessType recvProcess, String sendPacketStr) {		
 		
 		// sends a packet to a given destination process
@@ -838,6 +918,13 @@ public class ErrorSimulator {
 		printOpcode(sendPacket);
 	}
 	
+	/**
+	 * Displays results from an error simulation by inspecting the packet that should have been an ERROR
+	 * packet.  
+	 * 
+	 *  @param errorSource		the process (client or server) who sent the ERROR packet
+	 *  @param expectedErrCode	the TFTP error code that should be set
+	 */
 	private void printSimulationResult(ProcessType errorSource, byte expectedErrCode) {
 		
 		String srcProcName = errorSource.name().toLowerCase();
@@ -860,6 +947,12 @@ public class ErrorSimulator {
 		}
 	}
 	
+	/**
+	 * Get the type of a TFTP packet.   
+	 * 
+	 *  @param packet	the packet to inspect
+	 *  @return 		the type of the packet
+	 */
 	private PacketType getPacketType(DatagramPacket packet) {
 		
 		switch (packet.getData()[1]) {
@@ -885,15 +978,33 @@ public class ErrorSimulator {
 		}
 	} 
 	
+	/**
+	 * Display message to indicate end of simulation and receives user input to reset the menu.
+	 */
 	private void printEndSimulation() {
 		System.out.println("\nsimulation complete.");
 		System.out.println("press enter to continue");
 		keyboard.nextLine(); 
 	}
 	
-	// finish a file transfer by forwarding the packets between the client & server
-	// process A is the process whose "turn" it is to send a message
-	// process B is the other process
+	/**
+	 * Complete a file transfer by forwarding the remaining packets between the client & server.
+	 * 
+	 * In this method, parameters whose names end in "A" correspond to process A, which is expected
+	 * to be in a state of "next to send a packet." 
+	 * Parameters whose names end in "B" correspond to process B, which is expected to have just sent
+	 * a packet and is now expecting a response.
+	 * Process A may be the client or the server, as with process B.
+	 *  
+	 *  @param processA		the ProcessType value for process A
+	 *  @param socketA		the DatagramSocket that should be used to communicate with process A
+	 *  @param addrA		the InetAddress object belonging to process A
+	 *  @param portA		the port number used by process A
+	 *  @param processB		the ProcessType value for process B
+	 *  @param socketB		the DatagramSocket that should be used to communicate with process B
+	 *  @param addrB		the InetAddress object belonging to process B
+	 *  @param portB		the port number used by process B
+	 */
 	private void finishTransfer(ProcessType processA, DatagramSocket socketA, InetAddress addrA, int portA,
 					ProcessType processB, DatagramSocket socketB, InetAddress addrB, int portB) { 
 		
@@ -961,7 +1072,12 @@ public class ErrorSimulator {
 		
 	}
 	
-	// returns true if a DATA packet is the last one in a transfer, i.e. less than 512 bytes 
+	/**
+	 * Returns true if a DATA packet is the last one in a transfer, i.e. less than 512 bytes
+	 *  
+	 *  @param packet	the packet to inspect
+	 *  @return			false if not a DATA packet or length is 516 (512 + opcode length + block number) bytes
+	 */
 	private boolean isFinalDataPacket(DatagramPacket packet) {
 		// return false if not a DATA packet 
 		if (getPacketType(packet) != PacketType.DATA)
@@ -970,8 +1086,13 @@ public class ErrorSimulator {
 		// check length including opcode and block number
 		return packet.getLength() < 516;
 	}
-	
-	// returns true if an ERROR packet will end a transfer once it is received
+		
+	/**
+	 * Returns true if an ERROR packet will end a transfer once it is received.
+	 *  
+	 *  @param packet	the packet to inspect
+	 *  @return			false if not an ERROR packet or error code is 5 (unknown TID)
+	 */
 	private boolean isTerminatingErrorPacket(DatagramPacket packet) {
 		// return false if not an ERROR packet 
 		if (getPacketType(packet) != PacketType.ERROR)
@@ -983,6 +1104,12 @@ public class ErrorSimulator {
 		return errCode != PacketUtil.ERR_UNKNOWN_TID;
 	}
 
+	/**
+	 * Initialize an ErrorSimulator and run it.
+	 *  
+	 *  @param packet	the packet to inspect
+	 *  @return			false if not an ERROR packet or error code is 5 (unknown TID)
+	 */
 	public static void main(String args[]) {
 		ErrorSimulator sim = new ErrorSimulator();
 		try {

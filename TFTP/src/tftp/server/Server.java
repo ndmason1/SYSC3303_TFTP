@@ -28,6 +28,9 @@ import tftp.server.thread.WorkerThreadFactory;
  */
 public class Server {
 	
+	
+	public static final int SERVER_PORT = 69; 
+	
 	//private variables
 	private DatagramPacket receivePacket;
 	private DatagramSocket receiveSocket;
@@ -41,7 +44,7 @@ public class Server {
 	public Server()
 	{
 		try {
-			receiveSocket = new DatagramSocket(69);
+			receiveSocket = new DatagramSocket(SERVER_PORT);
 		} catch (SocketException se) {
 			se.printStackTrace();
 			System.exit(1);
@@ -73,7 +76,7 @@ public class Server {
 				
 			} catch (SocketException e) { 
 				// likely the socket was closed because the server is shutting down
-				System.out.println("Stopped listening on port 69.");
+				System.out.printf("Stopped listening on port %d.\n", SERVER_PORT);
 				
 			} catch (IOException e) {
 				System.out.println("IOexception listening for packets in main server thread");
