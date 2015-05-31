@@ -24,8 +24,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 
 import tftp.exception.TFTPException;
-import tftp.exception.TFTPFileIOException;
-import tftp.exception.TFTPPacketException;
 import tftp.net.PacketParser;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
@@ -38,17 +36,18 @@ import tftp.exception.*;
  *
  */
 public class Client {	 
-	
+
 	//Private variables
 	private DatagramSocket sendReceiveSocket;
 	private DatagramPacket sendPacket, receivePacket;
-	
+
 	private int targetPort;
+	private InetAddress targetIP; 
 	private String directory;
 	private String filename;
 	private String mode;
 	private File theFile;
-	
+
 	//default constructor for testing purposes mainly
 	public Client (){
 		try {
@@ -61,11 +60,23 @@ public class Client {
 		try {
 			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\client\\ClientFiles")));
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
+			System.out.println("Couldn't set up directory for client files! terminating");
 			e.printStackTrace();
+			cleanup();
+			System.exit(1);
+
+		}
+
+		try {
+			targetIP = InetAddress.getLocalHost();  // THIS WILL CHANGE IN ITERATION 5
+		} catch (UnknownHostException e) {
+			System.out.println("Couldn't set target IP address! terminating");
+			e.printStackTrace();
+			cleanup();
+			System.exit(1);
 		}
 	}
-	
+
 	//New constructor passes on filename and mode so it can be set and used everywhere
 	public Client(String file, String aMode) {
 		try {
@@ -74,48 +85,62 @@ public class Client {
 			se.printStackTrace();
 			System.exit(1);
 		}
-		
+
 		setFilename(file);
 		setMode(aMode);
-			
+
 		try {
 			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\client\\ClientFiles")));
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
+		} catch (IOException e) {			
+			System.out.println("Couldn't set up directory for client files! terminating");
 			e.printStackTrace();
+			cleanup();
+			System.exit(1);
 		}
 		setFile(new File(getDirectory().concat("\\" + getFilename())));
+
+		try {
+			targetIP = InetAddress.getLocalHost();  // THIS WILL CHANGE IN ITERATION 5
+		} catch (UnknownHostException e) {
+			System.out.println("Couldn't set target IP address! terminating");
+			e.printStackTrace();
+			cleanup();
+			System.exit(1);
+		}
 	}
 
 	public void cleanup() {
 		sendReceiveSocket.close();
 	}
-	
+
 	public void retreiveFile(){setFile(new File(getDirectory().concat("\\" + getFilename())));}
-	
+
 	public void checkValidReadOperation() throws TFTPException {
-			
-		// note that we are not throwing an exception here as we are allowing overwrites on either side
+
+
 		if (getFile().exists()){
+
 			
 			//Checking if user can read the file
 			Path path = Paths.get(directory + "\\" + filename);
 			if (!Files.isWritable(path)){
 				String msg = "Do not have write permission of destination file";
-				System.out.println(msg);
 				throw new TFTPException(msg, PacketUtil.ERR_ACCESS_VIOLATION);
 			}
+
+			// note that we are not throwing an exception for existing file here 
+			// as we are allowing overwrites on either side
 		}		
 	}
-	
+
 	public void checkValidWriteOperation() throws TFTPException {
-		
+
 		//Checking if the file exists
 		if (!getFile().exists()){
 			String msg = "source file not found: " + getDirectory();
 			System.out.println(msg);
 			throw new TFTPException(msg, PacketUtil.ERR_FILE_NOT_FOUND);
-			
+
 		}
 	
 		Path path = Paths.get(directory + "\\" + filename);
@@ -123,10 +148,11 @@ public class Client {
 			throw new TFTPException("Do not have read permission from source file", PacketUtil.ERR_ACCESS_VIOLATION);
 		}
 		if (getFile().length() > 33553920L){
-			throw new TFTPFileIOException("source file is too big! (files >  33MB not supported)", PacketUtil.ERR_UNDEFINED);
+			throw new TFTPException("source file is too big! (files >  33MB not supported)", PacketUtil.ERR_UNDEFINED);
 		}
 	}
 
+	// phasing this method out, PacketUtil's formRrqPacket() will be used instead
 	private byte[] prepareReadRequestPayload() {		
 
 		int msgLength = getFilename().length() + getMode().length() + 4; 
@@ -149,6 +175,7 @@ public class Client {
 		return msg;
 	}
 
+	// phasing this method out, PacketUtil's formWrqPacket() will be used instead
 	private byte[] prepareWriteRequestPayload() {
 
 		int msgLength = getFilename().length() + getMode().length() + 4; 
@@ -175,87 +202,112 @@ public class Client {
 
 		System.out.println("Starting read of file " + getFilename() + " from server...");
 
-		byte[] payload = prepareReadRequestPayload();		
+		// set up PacketUtil object to generate packets with
+		PacketUtil packetUtil = new PacketUtil(targetIP, targetPort);		
 
 		// create send packet
-		try {
-			sendPacket = new DatagramPacket(payload, payload.length, InetAddress.getLocalHost(), targetPort);
-		} catch (UnknownHostException e) {
-			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
-		}
+		sendPacket = packetUtil.formRrqPacket(getFilename(), getMode());
 
 		try {
 			sendReceiveSocket.send(sendPacket);
 		} catch (IOException e) {
+			System.out.println("Error sending request packet!");
 			e.printStackTrace();
-			System.exit(1);
+			cleanup();
+			return;
 		}
 
 		byte data[] = new byte[PacketUtil.BUF_SIZE];
 		receivePacket = new DatagramPacket(data, data.length);		
 
+		// get server response - the port it is sent from should be used as the server TID
 		try {			  
 			sendReceiveSocket.receive(receivePacket);
-			
+
 		} catch(IOException e) {
-			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+			System.out.println("Error receiving response to request packet!");
+			e.printStackTrace();
+			cleanup();
+			return;
 		}
-		
-		// check if this is an error packet
-        PacketParser parser = new PacketParser();
-       
-        try{
-        	//receive first data packet with block #1
-        	parser.parseDataPacket(receivePacket, 1);
-        }catch(ErrorReceivedException e){
-        	System.out.println(e.getMessage());
-            throw e;
-        }catch(TFTPPacketException ex){
-        	System.out.println(ex.getMessage());
-        	PacketUtil packetUtil = new PacketUtil(receivePacket.getAddress(),receivePacket.getPort());
-        	DatagramPacket errPkt = packetUtil.formErrorPacket(ex.getErrorCode(), ex.getMessage());
-        	try {
-				sendReceiveSocket.send(errPkt);
-			} catch (IOException e) {
-				e.printStackTrace();				
+
+		PacketParser parser = new PacketParser(targetIP, receivePacket.getPort());
+
+		try {
+			//receive first data packet with block #1
+			parser.parseDataPacket(receivePacket, 1);
+		} catch(ErrorReceivedException e) {
+			// the other side sent an error packet, so in most cases don't send a response
+
+			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+				// send error packet to the unknown TID
+				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				try {			   
+					sendReceiveSocket.send(errPacket);
+				} catch (IOException ex) { 
+					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+				}
 			}
-        	if (ex.getErrorCode() == PacketUtil.ERR_ILLEGAL_OP){
-        		System.out.println("File transfer can not start, terminating");
-        	    return;
-        	}
-        }catch(TFTPFileIOException exs){
-        	System.out.println(exs.getMessage());
-        	throw exs;
-        }catch(TFTPException w){
-        	System.out.println(w.getMessage());
-        	return;
-        }
-        
+
+			// rethrow so the client UI can print a message
+			throw e;
+
+		} catch(TFTPException e){
+			// send error packet
+			DatagramPacket errPacket = null;			
+
+			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+				// address packet to the unknown TID
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						receivePacket.getAddress(), receivePacket.getPort());						
+			} else {
+				// packet will be addressed to recipient as usual					
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+			}
+
+			try {			   
+				sendReceiveSocket.send(errPacket);			   
+			} catch (IOException ex) {			   
+				System.out.println("Error sending ERROR packet!");
+				e.printStackTrace();
+				cleanup();
+				return;
+			}
+
+			// rethrow so the client UI can print a message
+			throw e;
+		}
+
 		// request is good, set up a receiver to proceed with the transfer
 		Receiver r = new Receiver(sendReceiveSocket, receivePacket.getPort());
 		r.receiveFile(receivePacket, getFile());
 	}
 
 	public void sendWriteRequest() throws TFTPException {
+
 		
 		System.out.println("Starting write of file : " + getFilename() + " to server...");
 		byte[] payload = prepareWriteRequestPayload();
 
+
+		System.out.println("Starting write of file + " + getFilename() + " from server...");
+		
+		// set up PacketUtil object to generate packets with
+		PacketUtil packetUtil = new PacketUtil(targetIP, targetPort);		
+
+
 		checkValidWriteOperation();
 		// create send packet
-		try {
-			sendPacket = new DatagramPacket(payload, payload.length, InetAddress.getLocalHost(), targetPort);
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
-			System.exit(1);
-		}
+		sendPacket = packetUtil.formWrqPacket(getFilename(), getMode());
 
 		// send packet to server
 		try {
 			sendReceiveSocket.send(sendPacket);
 		} catch (IOException e) {
+			System.out.println("Error sending request packet!");
 			e.printStackTrace();
-			System.exit(1);
+			cleanup();
+			return;
 		}
 
 		// create recv packet
@@ -264,39 +316,58 @@ public class Client {
 
 		try {			  
 			sendReceiveSocket.receive(receivePacket);
-			
+
 		} catch(IOException e) {
+			System.out.println("Error receiving response to request packet!");
 			e.printStackTrace();
-			System.exit(1);
+			cleanup();
+			return;
 		}
-		
+
 		PacketParser parser = new PacketParser(receivePacket.getAddress(), receivePacket.getPort());
-		
+
 		try{
-		    parser.parseAckPacket(receivePacket, 0);
-		}catch(ErrorReceivedException e){
-			System.out.println(e.getMessage());
-            
-		}catch(TFTPPacketException ex){
-			//logger.error(ex.getMessage());
-			System.out.println(ex.getMessage());
-			PacketUtil packetUtil = new PacketUtil(receivePacket.getAddress(),receivePacket.getPort());
-        	DatagramPacket errPkt = packetUtil.formErrorPacket(ex.getErrorCode(), ex.getMessage());
-        	try{
-        	    sendReceiveSocket.send(errPkt);
-        	}catch(IOException ew){
-        		throw new TFTPException(ew.getMessage(), PacketUtil.ERR_UNDEFINED);
-        	}
-        	        	
-        	throw ex;
-		}catch(TFTPFileIOException exs){
-        	//logger.error(exs.getMessage());
-        	System.out.println(exs.getMessage());
-        	throw exs;
-		}catch(TFTPException w){
-        	//logger.error(w.getMessage());
-        	System.out.println(w.getMessage());
-        	throw w;
+			parser.parseAckPacket(receivePacket, 0);
+		} catch(ErrorReceivedException e) {
+			// the other side sent an error packet, so in most cases don't send a response
+
+			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+				// send error packet to the unknown TID
+				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				try {			   
+					sendReceiveSocket.send(errPacket);
+				} catch (IOException ex) { 
+					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+				}
+			}
+
+			// rethrow so the client UI can print a message
+			throw e;
+
+		} catch(TFTPException e){
+			// send error packet
+			DatagramPacket errPacket = null;			
+
+			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+				// address packet to the unknown TID
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						receivePacket.getAddress(), receivePacket.getPort());						
+			} else {
+				// packet will be addressed to recipient as usual					
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+			}
+
+			try {			   
+				sendReceiveSocket.send(errPacket);			   
+			} catch (IOException ex) {			   
+				System.out.println("Error sending ERROR packet!");
+				e.printStackTrace();
+				cleanup();
+				return;
+			}
+
+			// rethrow so the client UI can print a message
+			throw e;
 		}
 
 		// set up a sender to proceed with the transfer
@@ -305,18 +376,20 @@ public class Client {
 		try {
 			s.sendFile(getFile());
 		} catch (TFTPException e) {
-			System.out.println("ERROR CODE " + e.getErrorCode());
-			System.out.println(e.getMessage());
+			// just throw it, client UI can print message
+			throw e;
+//			System.out.println("ERROR CODE " + e.getErrorCode());
+//			System.out.println(e.getMessage());
 		}
 	}
-	
+
 	//Client get functions
 	public String getDirectory(){return directory;}
 	public String getFilename(){return filename;}
 	public int getPortNum(){return targetPort;}
 	public String getMode(){return mode;}
 	public File getFile(){return theFile;}
-	
+
 	//Client set functions
 	public void setFilename(String aFilename){filename = aFilename;}
 	public void setDirectory(String aDirectory){directory = aDirectory;}

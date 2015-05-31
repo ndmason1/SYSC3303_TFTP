@@ -8,16 +8,18 @@
 
 package tftp.net;
 
-import java.io.*;
-import java.net.*;
-import java.util.*;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
-import tftp.exception.TFTPFileIOException;
-import tftp.exception.TFTPPacketException;
-import tftp.server.thread.OPcodeError;
+import tftp.server.thread.WorkerThread;
 
 public class Receiver
 {    
@@ -27,6 +29,8 @@ public class Receiver
 	private PacketUtil packetUtil;
 	static String filename; 			//name of the file
 	private PacketParser packetParser;
+	
+	private WorkerThread ownerThread = null; // whatever server thread is using this object
 
 	public Receiver(DatagramSocket socket, int senderPort){		
 
@@ -42,12 +46,65 @@ public class Receiver
 		packetParser = new PacketParser(senderIP, senderPort);
 		
 	}
+	
+	// extra constructor to allow the Receiver to print messages in the context of a server thread
+	public Receiver(WorkerThread ownerThread, DatagramSocket socket, int senderPort){
+		this(socket, senderPort);		
+		this.ownerThread = ownerThread;
+	}
 
 	public void receiveFile(DatagramPacket initPacket, File aFile) throws TFTPException {
-		System.out.println("RECEIVER: top of receiveFile()");
 		
-		// parse the first DATA packet and see if we even need to set up 
+		int blockNum = 1;
 		
+		// parse the first DATA packet and see if we even need to continue
+		try {
+			printToConsole("RECEIVER: about to parse DATA packet with block number " + blockNum);
+			packetParser.parseDataPacket(initPacket, blockNum);
+
+		} catch (ErrorReceivedException e) {
+			// the other side sent an error packet, so in most cases don't send a response
+
+			// we could have gotten an error packet from an unknown TID, so we need to respond to that TID
+			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+				
+				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				// address packet to the unknown TID
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						initPacket.getAddress(), initPacket.getPort());
+				try {			   
+					socket.send(errPacket);
+				} catch (IOException ex) { 
+					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+				}
+			}
+			
+			// rethrow so the owner of this Receiver knows whats up
+			throw e;
+			
+		} catch (TFTPException e) {
+
+			// send error packet
+			DatagramPacket errPacket = null;
+			
+			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+				// address packet to the unknown TID
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						initPacket.getAddress(), initPacket.getPort());						
+			} else {
+				// packet will be addressed to recipient as usual					
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+			}
+			
+			try {			   
+				socket.send(errPacket);			   
+			} catch (IOException ex) {			   
+				throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+			}
+			
+			// rethrow so the owner of this Receiver knows whats up
+			throw e;
+		}
 		
 		File theFile = aFile;
 		FileOutputStream fileWriter = null;
@@ -83,8 +140,6 @@ public class Receiver
 			data = new byte[PacketUtil.BUF_SIZE];
 			DatagramPacket receivePacket = new DatagramPacket(data, data.length);
 
-			int blockNum = 1;
-			packetParser.parseDataPacket(initPacket, blockNum);
 
 			// send ACK for initial data packet
 			DatagramPacket sendPacket = packetUtil.formAckPacket(blockNum);
@@ -100,7 +155,7 @@ public class Receiver
 
 			while (!done) {
 				// wait for response
-				System.out.println("waiting for next DATA segment...");
+				printToConsole("waiting for next DATA segment...");
 				try {			  
 					socket.receive(receivePacket);
 					//
@@ -108,7 +163,7 @@ public class Receiver
 					ex.printStackTrace();
 					System.exit(1);
 				}
-				System.out.println(String.format("DATA %d received", blockNum));
+				printToConsole(String.format("DATA %d received", blockNum));
 				
 				
 				// increment block number so we can check if received packet has expected block number
@@ -116,55 +171,54 @@ public class Receiver
 				
 				// parse the response packet to ensure it is correct before continuing
 				try {
-					System.out.println("RECEIVER: about to parse DATA packet with block number " + blockNum);
+					printToConsole("RECEIVER: about to parse DATA packet with block number " + blockNum);
 					packetParser.parseDataPacket(receivePacket, blockNum);
 
-				} catch (TFTPPacketException e) {
-					// send error packet
-					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-					errPacket.setAddress(receivePacket.getAddress());
-					errPacket.setPort(receivePacket.getPort());
-					try {			   
-						socket.send(errPacket);			   
-					} catch (IOException ex) {			
-						ex.printStackTrace();						
-						continue;
-					}
-					// keep going
-					continue;
-
-				} catch (TFTPFileIOException e) {
-					e.printStackTrace();
-
-					// send error packet to client
-					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-					try {			   
-						socket.send(errPacket);			   
-					} catch (IOException ex) {		
-						ex.printStackTrace();
-						return;
-					}
-					return;
-
 				} catch (ErrorReceivedException e) {
-					// the client sent an error packet, so in most cases don't send a response
-					e.printStackTrace();
+					// the other side sent an error packet, so in most cases don't send a response
 
+					// we could have gotten an error packet from an unknown TID, so we need to respond to that TID
 					if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-						// send error packet to the unknown TID
+						
 						DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+						// address packet to the unknown TID
+						errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+								receivePacket.getAddress(), receivePacket.getPort());
 						try {			   
-							socket.send(errPacket);			   
-						} catch (IOException ex) {	
-							ex.printStackTrace();
-							return;
+							socket.send(errPacket);
+						} catch (IOException ex) { 
+							// TODO fix resource leak
+							throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 						}
-					} else return;
-
+					}
+					
+					// rethrow so the owner of this Receiver knows whats up
+					throw e;
+					
 				} catch (TFTPException e) {
-					e.printStackTrace();
-					// this block shouldn't get executed, but needs to be here to compile
+
+					// send error packet
+					DatagramPacket errPacket = null;
+					
+					if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+						// address packet to the unknown TID
+						errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+								receivePacket.getAddress(), receivePacket.getPort());						
+					} else {
+						// packet will be addressed to recipient as usual					
+						errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+					}
+					
+					try {			   
+						socket.send(errPacket);			   
+					} catch (IOException ex) {			   
+						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+					}
+					
+					// rethrow so the owner of this Receiver knows whats up
+					throw e;
 				}
+				
 				//Check if the disk is already full, If full generate Error code-3
 				//By Syed Taqi - 2015/05/08
 				if (theFile.getUsableSpace() < receivePacket.getLength()){				
@@ -203,7 +257,7 @@ public class Receiver
 				blockNum = packetUtil.parseDataPacket(receivePacket);
 				// TODO verify block num
 				sendPacket = packetUtil.formAckPacket(blockNum);
-				System.out.println(String.format("sending ACK %d", blockNum));		
+				printToConsole(String.format("sending ACK %d", blockNum));		
 				
 
 				try {
@@ -214,7 +268,7 @@ public class Receiver
 					System.exit(1);
 				}
 			}
-			System.out.println("*** finished transfer ***");
+			printToConsole("*** finished transfer ***");
 		} finally {
 			closeFileWriter(fileWriter);
 		}
@@ -228,5 +282,12 @@ public class Receiver
 		} catch (IOException e) {
 			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 		}
+	}
+	
+	private void printToConsole(String message) {
+		if (ownerThread != null) // server thread owns this object
+			System.out.printf("%s: %s\n", ownerThread.getName(), message);
+		else // client owns this object
+			System.out.printf("%s\n", message);
 	}
 }

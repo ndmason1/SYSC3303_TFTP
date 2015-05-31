@@ -11,7 +11,7 @@ package tftp.server.thread;
 
 import java.net.DatagramPacket;
 
-import tftp.exception.TFTPPacketException;
+import tftp.exception.TFTPException;
 import tftp.net.PacketUtil;
 
 /**
@@ -26,7 +26,7 @@ public class WorkerThreadFactory {
 	 * @param  reqPacket  the packet containing the client's request
 	 * @return            a new WorkerThread
 	 */
-	public WorkerThread createWorkerThread(DatagramPacket reqPacket) throws TFTPPacketException {		
+	public WorkerThread createWorkerThread(DatagramPacket reqPacket) throws TFTPException {		
 		
 		byte[] data = reqPacket.getData();
 		
@@ -35,7 +35,7 @@ public class WorkerThreadFactory {
 		} else if (data[1] == PacketUtil.WRITE_FLAG) {
 			return new WriteHandlerThread(reqPacket);
 		} else {
-			throw new TFTPPacketException("expected a request packet", PacketUtil.ERR_ILLEGAL_OP);
+			throw new TFTPException("expected a request packet", PacketUtil.ERR_ILLEGAL_OP);
 		}			
 	}
 }

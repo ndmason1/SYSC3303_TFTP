@@ -16,8 +16,6 @@ import java.nio.file.Paths;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
-import tftp.exception.TFTPFileIOException;
-import tftp.exception.TFTPPacketException;
 import tftp.net.PacketUtil;
 import tftp.net.Sender;
 
@@ -35,7 +33,7 @@ public class ReadHandlerThread extends WorkerThread {
 	private String directory; 
 	
 	public ReadHandlerThread(DatagramPacket reqPacket) {
-		super(reqPacket);
+		super("ReadHandler-" + id++, reqPacket);
 	}	
 
 	/**
@@ -45,7 +43,7 @@ public class ReadHandlerThread extends WorkerThread {
 	@Override
 	public void run() {
 		
-		System.out.println("Started read handler thread");
+		printToConsole("processing request");
 		
 		byte[] data = reqPacket.getData();
 		PacketUtil packetUtil = new PacketUtil(reqPacket.getAddress(), reqPacket.getPort());
@@ -53,60 +51,28 @@ public class ReadHandlerThread extends WorkerThread {
 		
 		// parse the request packet to ensure it is correct before starting the transfer
 		try {
-			filename = packetParser.parseRRQPacket(reqPacket);
-			
-		} catch (TFTPPacketException e) {			
-			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+			filename = packetParser.parseRRQPacket(reqPacket);		
+		} catch (TFTPException e) {
+			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 			// send error packet
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
 			try {			   
 				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {	
-				System.out.printf("ERROR: IOException: %s\n", ex.getMessage());
-				return;
-			}
-			return;
-			
-		} catch (TFTPFileIOException e) {
-			
-			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
-			// send error packet to client
-			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-			try {			   
-				sendReceiveSocket.send(errPacket);			   
 			} catch (IOException ex) {
-				System.out.printf("ERROR: IOException: %s\n", ex.getMessage());
+				printToConsole("IOException occured while attemping to send ERROR packet");
+				ex.printStackTrace();
+				cleanup();
 				return;
 			}
 			return;
-			
-		} catch (ErrorReceivedException e) {
-			// the client sent an error packet, so in most cases don't send a response
-			
-			System.out.println("Error packet received from client!");
-			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
-			
-			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-				// send error packet to the unknown TID
-				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-				try {			   
-					sendReceiveSocket.send(errPacket);			   
-				} catch (IOException ex) {	
-					System.out.printf("ERROR: IOException: %s\n", ex.getMessage());
-					return;
-				}
-			} else return;
-			
-		} catch (TFTPException e) {
-			// this block shouldn't get executed, but needs to be here to compile
-			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
 		}
 		
 		try {
 			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\server\\ServerFiles")));
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
+		} catch (IOException e1) {			
 			e1.printStackTrace();
+			cleanup();
+			return;
 		}
 	
 		//\\//\\//\\ File Not Found - Error Code 1 //\\//\\//\\
@@ -123,10 +89,14 @@ public class ReadHandlerThread extends WorkerThread {
 
 			try {			   
 				sendReceiveSocket.send(error);
-			} catch (IOException ex) {				
+			} catch (IOException ex) {
+				printToConsole("IOException occured while attemping to send ERROR packet");
 				ex.printStackTrace();
-			}			   
-			sendReceiveSocket.close();			   
+				cleanup();
+				return;
+			}
+			
+			cleanup();			   
 			return;
 		}
 		
@@ -139,20 +109,26 @@ public class ReadHandlerThread extends WorkerThread {
 
 			try {			   
 				sendReceiveSocket.send(error);			   
-			} catch (IOException ex) {			   
+			} catch (IOException ex) {
+				printToConsole("IOException occured while attemping to send ERROR packet");
 				ex.printStackTrace();
-			}			   
-			sendReceiveSocket.close();			   
+				cleanup();
+				return;
+			}
+			
+			cleanup();			   
 			return;
 		}
 		
 		// request is good if we made it here
 		// read request, so start a file transfer
-		Sender s = new Sender(sendReceiveSocket, clientPort);
+		Sender s = new Sender(this, sendReceiveSocket, clientPort);
 		try {			
 			s.sendFile(f);
 		} catch (TFTPException e) {
-			System.out.printf("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage());
+			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
+			cleanup();
+			return;
 		}
 		
 		cleanup();

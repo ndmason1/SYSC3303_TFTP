@@ -16,7 +16,7 @@ import java.net.DatagramSocket;
 import java.net.SocketException;
 import java.util.HashSet;
 
-import tftp.exception.TFTPPacketException;
+import tftp.exception.TFTPException;
 import tftp.net.PacketUtil;
 import tftp.server.thread.WorkerThread;
 import tftp.server.thread.WorkerThreadFactory;
@@ -52,8 +52,7 @@ public class Server {
 		
 		activatedThreads = new HashSet<WorkerThread>();
 		acceptNewConnections = true;
-		threadCount = 0;		
-		//mainDirectory = Config.getServerDirectory();
+		threadCount = 1;
 	}
 
 	public void cleanup() {
@@ -76,20 +75,20 @@ public class Server {
 				System.exit(1);
 			}
 			
-			System.out.println( (String.format("Request received. Creating handler thread %d", threadCount)) );
+			System.out.println( (String.format("Request received. Creating handler thread %d", threadCount++)) );
 			// spawn a thread to process request
 			WorkerThread worker = null;
 			try {
 				worker = threadFactory.createWorkerThread(receivePacket);				
 				worker.start();
-			} catch (TFTPPacketException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+			} catch (TFTPException e) {
+				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());				
 			}
 			activatedThreads.add(worker);
 		}
 	}
 
+	// TODO: better way to stop threads, likely using interrupt()
 	public void finishProcessing() {
 		acceptNewConnections = false;
 		for (Thread t : activatedThreads) {
