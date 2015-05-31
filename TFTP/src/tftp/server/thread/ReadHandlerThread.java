@@ -8,9 +8,11 @@
 
 package tftp.server.thread;
 
+import java.nio.file.*;
 import java.io.File;
 import java.io.IOException;
 import java.net.DatagramPacket;
+import java.nio.file.Paths;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
@@ -111,7 +113,7 @@ public class ReadHandlerThread extends WorkerThread {
 
 		//Opens an input stream
 		File f = new File(getDirectory().concat("\\" + filename));
-		
+		Path path = Paths.get(getDirectory().concat("\\" + filename));
 		if(!f.exists()){    //file doesn't exist
 
 			byte errorCode = PacketUtil.ERR_FILE_NOT_FOUND;   //error code 1 : file not found
@@ -128,7 +130,7 @@ public class ReadHandlerThread extends WorkerThread {
 			return;
 		}
 		
-		if(!f.canRead()){    // no read access
+		if(!Files.isReadable(path)){    // no read access
 
 			byte errorCode = PacketUtil.ERR_ACCESS_VIOLATION;   //error code 2 : access violation
 			DatagramPacket error= OPcodeError.OPerror("ACCESS VIOLATION",errorCode);  //create error packet

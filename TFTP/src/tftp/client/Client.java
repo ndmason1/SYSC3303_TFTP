@@ -8,6 +8,7 @@
 
 package tftp.client;
 
+import java.nio.file.*;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -18,6 +19,9 @@ import java.net.SocketException;
 import java.net.UnknownHostException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
+import java.nio.file.FileSystems;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import tftp.exception.TFTPException;
 import tftp.exception.TFTPFileIOException;
@@ -95,8 +99,9 @@ public class Client {
 		if (getFile().exists()){
 			
 			//Checking if user can read the file
-			if (!getFile().canWrite()){
-				String msg = "cannot write to destination file";
+			Path path = Paths.get(directory + "\\" + filename);
+			if (!Files.isWritable(path)){
+				String msg = "Do not have write permission of destination file";
 				System.out.println(msg);
 				throw new TFTPException(msg, PacketUtil.ERR_ACCESS_VIOLATION);
 			}
@@ -112,8 +117,10 @@ public class Client {
 			throw new TFTPException(msg, PacketUtil.ERR_FILE_NOT_FOUND);
 			
 		}
-		if (!getFile().canRead()){			
-			throw new TFTPException("cannot read from source file", PacketUtil.ERR_ACCESS_VIOLATION);
+	
+		Path path = Paths.get(directory + "\\" + filename);
+		if (!Files.isReadable(path)){			
+			throw new TFTPException("Do not have read permission from source file", PacketUtil.ERR_ACCESS_VIOLATION);
 		}
 		if (getFile().length() > 33553920L){
 			throw new TFTPFileIOException("source file is too big! (files >  33MB not supported)", PacketUtil.ERR_UNDEFINED);
@@ -231,9 +238,10 @@ public class Client {
 
 	public void sendWriteRequest() throws TFTPException {
 		
-		System.out.println("Starting write of file + " + getFilename() + " from server...");
+		System.out.println("Starting write of file : " + getFilename() + " to server...");
 		byte[] payload = prepareWriteRequestPayload();
 
+		checkValidWriteOperation();
 		// create send packet
 		try {
 			sendPacket = new DatagramPacket(payload, payload.length, InetAddress.getLocalHost(), targetPort);
