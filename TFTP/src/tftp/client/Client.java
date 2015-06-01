@@ -16,6 +16,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.FileAlreadyExistsException;
@@ -52,6 +53,9 @@ public class Client {
 	public Client (){
 		try {
 			sendReceiveSocket = new DatagramSocket();
+			
+			//set socket timeout to 2 sec
+			sendReceiveSocket.setSoTimeout(2*1000);
 		} catch (SocketException se) {
 			se.printStackTrace();
 			System.exit(1);
@@ -81,6 +85,7 @@ public class Client {
 	public Client(String file, String aMode) {
 		try {
 			sendReceiveSocket = new DatagramSocket();
+			sendReceiveSocket.setSoTimeout(5*1000);
 		} catch (SocketException se) {
 			se.printStackTrace();
 			System.exit(1);
@@ -207,9 +212,9 @@ public class Client {
 
 		// create send packet
 		sendPacket = packetUtil.formRrqPacket(getFilename(), getMode());
-
+	
 		try {
-			sendReceiveSocket.send(sendPacket);
+			sendReceiveSocket.send(sendPacket);	
 		} catch (IOException e) {
 			System.out.println("Error sending request packet!");
 			e.printStackTrace();
@@ -221,16 +226,39 @@ public class Client {
 		receivePacket = new DatagramPacket(data, data.length);		
 
 		// get server response - the port it is sent from should be used as the server TID
-		try {			  
-			sendReceiveSocket.receive(receivePacket);
-
-		} catch(IOException e) {
-			System.out.println("Error receiving response to request packet!");
-			e.printStackTrace();
-			cleanup();
-			return;
+        boolean PacketReceived = false;
+        int retransmission = 0;
+        while (!PacketReceived && retransmission < 2){
+        	try {			  
+        		sendReceiveSocket.receive(receivePacket);
+        		PacketReceived = true;
+        	} catch(SocketTimeoutException ex){
+        		//no response received after 1 sec, resending
+        		// TODO  how to resend twice if no response again
+        		try {
+        			System.out.println("Socket Timeout for response of request packet, resending...");
+        			sendReceiveSocket.send(sendPacket);	
+        			retransmission ++;
+        		} catch (IOException e) {
+        			System.out.println("Error sending request packet!");
+        			e.printStackTrace();
+        			cleanup();
+        			return;
+        		}	    
+        	} catch(IOException e) {
+        		System.out.println("Error receiving response to request packet!");
+        		e.printStackTrace();
+        		cleanup();
+        		return;
+        	}
 		}
-
+        
+        if (retransmission == 2){
+        	System.out.println("Can not complete sending Request, teminated");
+        	cleanup();
+        	return;
+        }
+        
 		PacketParser parser = new PacketParser(targetIP, receivePacket.getPort());
 
 		try {
@@ -314,16 +342,39 @@ public class Client {
 		byte data[] = new byte[PacketUtil.BUF_SIZE];
 		receivePacket = new DatagramPacket(data, data.length);
 
-		try {			  
-			sendReceiveSocket.receive(receivePacket);
-
-		} catch(IOException e) {
-			System.out.println("Error receiving response to request packet!");
-			e.printStackTrace();
-			cleanup();
-			return;
+        boolean PacketReceived = false;
+        int retransmission = 0;
+        while (!PacketReceived && retransmission < 2){
+        	try {			  
+        		sendReceiveSocket.receive(receivePacket);
+        		PacketReceived = true;
+        	} catch(SocketTimeoutException ex){
+        		//no response received after 1 sec, resending
+        		// TODO  how to resend twice if no response again
+        		try {
+        			System.out.println("Socket Timeout for response of request packet, resending...");
+        			sendReceiveSocket.send(sendPacket);	
+        			retransmission ++;
+        		} catch (IOException e) {
+        			System.out.println("Error sending request packet!");
+        			e.printStackTrace();
+        			cleanup();
+        			return;
+        		}	    
+        	} catch(IOException e) {
+        		System.out.println("Error receiving response to request packet!");
+        		e.printStackTrace();
+        		cleanup();
+        		return;
+        	}
 		}
-
+        
+        if (retransmission == 2){
+        	System.out.println("Can not complete sending Request, teminated");
+        	cleanup();
+        	return;
+        }
+        
 		PacketParser parser = new PacketParser(receivePacket.getAddress(), receivePacket.getPort());
 
 		try{

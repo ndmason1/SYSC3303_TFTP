@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 
 import tftp.exception.ErrorReceivedException;
@@ -154,15 +155,34 @@ public class Receiver
 			boolean done = initPacket.getLength() < 516;		
 
 			while (!done) {
-				// wait for response
-				printToConsole("waiting for next DATA segment...");
-				try {			  
-					socket.receive(receivePacket);
-					//
-				} catch(IOException ex) {
-					ex.printStackTrace();
-					System.exit(1);
+				boolean PacketReceived = false;
+				int retransmission = 0;
+				while (!PacketReceived && retransmission < 2){
+					// wait for response
+					printToConsole("waiting for next DATA segment...");
+					try {			  
+						socket.receive(receivePacket);
+						PacketReceived = true;
+						//
+					} catch(SocketTimeoutException e){
+						//response data packet not received, last ack packet may lost, resending...
+						try {
+							socket.send(sendPacket);
+							retransmission ++;
+						} catch (IOException ew) {
+							throw new TFTPException(ew.getMessage(), PacketUtil.ERR_UNDEFINED);
+						}
+
+					} catch(IOException ex) {
+						ex.printStackTrace();
+						System.exit(1);
+					}
 				}
+		        if (retransmission == 2){
+		        	System.out.println("Can not complete tranfer file, teminated");
+		        	return;
+		        }
+		        
 				printToConsole(String.format("DATA %d received", blockNum));
 				
 				

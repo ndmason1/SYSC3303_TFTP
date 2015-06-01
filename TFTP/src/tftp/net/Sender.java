@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 
 import tftp.exception.ErrorReceivedException;
@@ -97,11 +98,30 @@ public class Sender {
 
 			// expect an ACK from the other side
 			printToConsole(String.format("waiting for ACK %d", blockNum));
-			try {
-				socket.receive(reply);
-			} catch (IOException e) {
-				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
-			}                
+	        boolean PacketReceived = false;
+	        int retransmission = 0;
+	        while (!PacketReceived && retransmission < 2){
+	        	try {
+	        		socket.receive(reply);
+	        		PacketReceived = true;
+	        	} catch (SocketTimeoutException ex){
+	        		//no response for last Data packet, Data packet may lost, resending...
+	        		printToConsole("Wait ack packet timeout, last data packet may lost, resending...");
+	    			try {
+	    				socket.send(sendPacket);
+	    				retransmission ++;
+	    			} catch (IOException e) {
+	    				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+	    			}
+	        	} catch (IOException e) {
+	        		throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+	        	}     
+	        }
+	        
+	        if (retransmission == 2){
+	        	System.out.println("Can not complete sending Request, teminated");
+	        	return;
+	        }
 
 			// parse ACK to ensure it is correct before continuing
 			try {
