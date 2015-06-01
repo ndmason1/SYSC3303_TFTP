@@ -17,13 +17,13 @@ import tftp.server.Server;
  * An ErrorSimulator acts as a man-in-the-middle between a TFTP server and client.
  * It behaves like the server from the perspective of the client, and behaves like
  * a client from the perspective of the server. It may run in several different modes
- * to simulate network-related errors.
+ * to simulate network congestion and network-related errors.
  * 
  *  Note that the Client must be run in the correct mode to communicate with the ErrorSimulator.
  */
 public class ErrorSimulator {
 	
-	private static final int LISTEN_PORT = 78; // not using 68 due to its usage by windows DHCP service	
+	public static final int LISTEN_PORT = 78; // not using 68 due to its usage by windows DHCP service	
 
 	// sockets used for communicating with the client and server, respectively	
 	// new sockets
@@ -41,7 +41,7 @@ public class ErrorSimulator {
 	
 	// enum values which keep track of user selections
 	private ProcessType receiverProcessSelection;
-	private ErrorType errorTypeSelection;
+	private SimulationType simTypeSelection;
 	private IllegalOperationType illegalOpTypeSelection;
 	private PacketType packetTypeSelection;	
 	
@@ -84,26 +84,50 @@ public class ErrorSimulator {
 	 * Starts the execution of an ErrorSimulator and displays the top level menu.
 	 */
 	public void showMainMenu() {
-		System.out.println("Please select the type of error to simulate: \n");		
+		System.out.println("Please select the type of simulation: \n");		
 		System.out.println("(1) Illegal operation (TFTP error code 4)");
 		System.out.println("(2) Unknown TID (TFTP error code 5)");
-		// add others here, probably
+		System.out.println("(3) Lost Packet");
+		System.out.println("(4) Delayed Packet");
+		System.out.println("(5) Duplicate Packet");
+		System.out.println("(6) Sorcerer's Apprentice Bug (one side's DATA/ACKs will be delayed)");
+		// maybe others
 		System.out.println("(9) No error (packets will be relayed unmodified)");
 		System.out.println("[ PRESS Q TO QUIT ]\n");
 
 		switch (getInput()) {
 		case 1: 
-			errorTypeSelection = ErrorType.ILLEGAL_OP;
-			showProcessMenu();
+			simTypeSelection = SimulationType.ILLEGAL_OP;
+			showProcessMenu("selected simulation: Illegal Operation error.");
 			break;
 
 		case 2:
-			errorTypeSelection = ErrorType.UNKNOWN_TID;
-			showProcessMenu();
+			simTypeSelection = SimulationType.UNKNOWN_TID;
+			showProcessMenu("selected simulation: Unknown TID error.");
+			break;
+			
+		case 3:
+			simTypeSelection = SimulationType.PACKET_LOST;
+			showProcessMenu("selected simulation: Lost Packet.");
+			break;
+			
+		case 4:
+			simTypeSelection = SimulationType.PACKET_DELAY;
+			showProcessMenu("selected simulation: Delayed Packet.");
+			break;
+			
+		case 5:
+			simTypeSelection = SimulationType.PACKET_DUPLICATE;
+			showProcessMenu("selected simulation: Duplicate Packet.");
+			break;
+			
+		case 6:
+			simTypeSelection = SimulationType.SORC_APPRENTICE;
+			showProcessMenu("selected simulation: Sorcerer's Apprentice Bug.");
 			break;
 
 		case 9:
-			errorTypeSelection = ErrorType.NONE;
+			simTypeSelection = SimulationType.NONE;
 			relayRequestWithoutErrors();
 			break;
 		}
@@ -112,16 +136,20 @@ public class ErrorSimulator {
 	/**
 	 * Display a menu for the user to select which process receives a packet.
 	 */
-	private void showProcessMenu() {
+	private void showProcessMenu(String prevSelectionMessage) {
 
-		// build message based on previous selection
-		String message = errorTypeSelection == ErrorType.ILLEGAL_OP ?
-				"Illegal operation" :
-					"Uknown TID"; 
-		message += " error selected.";
-
-		System.out.println(message);
-		System.out.println("Which process should receive the invalid packet? \n");		
+		System.out.println(prevSelectionMessage);
+		if (simTypeSelection == SimulationType.ILLEGAL_OP || simTypeSelection == SimulationType.ILLEGAL_OP)
+			System.out.println("Which process should receive the invalid packet? \n");
+		else if (simTypeSelection == SimulationType.PACKET_LOST)
+			System.out.println("Which process should expect the packet that gets lost? \n");
+		else if (simTypeSelection == SimulationType.PACKET_DELAY)
+			System.out.println("Which process should receive the delayed packet? \n");
+		else if (simTypeSelection == SimulationType.PACKET_DUPLICATE)
+			System.out.println("Which process should receive the duplicated packet? \n");
+		else if (simTypeSelection == SimulationType.SORC_APPRENTICE)
+			System.out.println("Which process should receive delayed packets? \n");
+			
 		System.out.println("(1) Client");
 		System.out.println("(2) Server");
 		System.out.println("[ PRESS Q TO QUIT ]\n");
@@ -134,7 +162,7 @@ public class ErrorSimulator {
 			receiverProcessSelection = ProcessType.SERVER;
 		}
 
-		switch (errorTypeSelection) {
+		switch (simTypeSelection) {
 		case ILLEGAL_OP:
 			showPacketTypeMenu();
 			break;
@@ -143,8 +171,21 @@ public class ErrorSimulator {
 			simulateUnknownTID();
 			break;
 
+		
+		case PACKET_DELAY:
+			break;
+		case PACKET_DUPLICATE:
+			break;
+		case PACKET_LOST:
+			break;
+		case SORC_APPRENTICE:
+			break;
+			
 		case NONE:
 			// shouldn't get here
+			break;
+			
+		default:
 			break;
 		}
 	}

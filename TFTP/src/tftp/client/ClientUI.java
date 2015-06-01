@@ -12,6 +12,8 @@ import java.util.Scanner;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
+import tftp.server.Server;
+import tftp.sim.ErrorSimulator;
 
 public class ClientUI {
 
@@ -34,12 +36,12 @@ public class ClientUI {
 		
 			if (errorSimulator.toLowerCase().equals("yes") || errorSimulator.toLowerCase().equals("y"))
 			{
-				client.setPortNum(78);
+				client.setPortNum(ErrorSimulator.LISTEN_PORT);
 				check = false;
 			}
 			if (errorSimulator.toLowerCase().equals("no") || errorSimulator.toLowerCase().equals("n"))
 			{
-				client.setPortNum(69);
+				client.setPortNum(Server.SERVER_PORT);
 				check = false;
 			}
 		}
