@@ -275,7 +275,6 @@ public class Receiver
 
 				// send ACK
 				blockNum = packetUtil.parseDataPacket(receivePacket);
-				// TODO verify block num
 				sendPacket = packetUtil.formAckPacket(blockNum);
 				printToConsole(String.format("sending ACK %d", blockNum));		
 				
@@ -300,7 +299,7 @@ public class Receiver
 			fileWriter.flush();
 			fileWriter.close();
 		} catch (IOException e) {
-			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+			throw new TFTPException("Error closing FileOutputStream: "+e.getMessage(), PacketUtil.ERR_UNDEFINED);
 		}
 	}
 	
