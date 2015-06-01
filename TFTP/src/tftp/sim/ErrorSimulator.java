@@ -551,6 +551,8 @@ public class ErrorSimulator {
 			System.out.println("terminating simulation");
 			return;
 		}
+		
+		
 
 		// if chosen packet type is request packet, need to make sure what was received matches
 		if (packetTypeSelection == PacketType.RRQ) {
@@ -571,30 +573,23 @@ public class ErrorSimulator {
 				// receive response (should be ERROR)
 				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ERROR (4)");
 				
-				// check to see if server response is correct				
-				if (receivedPacketType == PacketType.ERROR) {
-
-					if (receivePacket.getData()[3] == PacketUtil.ERR_ILLEGAL_OP) {
-						String msg = getErrMessage(receivePacket.getData());
-						System.out.println("Server responded with ERROR code 4 as expected! [PASS]");
-						System.out.printf("error message from packet: \"%s\"\n", msg);
-					} else {
-						String msg = getErrMessage(receivePacket.getData());
-						System.out.printf("Server responded with ERROR code %d (not 4 as expected) [FAIL]\n", receivePacket.getData()[3]);
-						System.out.printf("error message from packet: \"%s\"\n", msg);
-					}
-
-				} else { // not an error packet
-					System.out.println("Server response was not an ERROR packet as expected [FAIL]"); 
-				}
+				// check to see if server response is correct		
+				printSimulationResult(ProcessType.SERVER, PacketUtil.ERR_ILLEGAL_OP);
 				
-				System.out.println("passing server response to client...");
 				// pass server response to client
 				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
 				sendPacket.setAddress(clientIP);
 				sendPacket.setPort(clientPort);
 				
 				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK/ERROR");
+				
+				// if the last packet received wasn't an error, finish the transfer so client goes back to ready state
+				if (receivedPacketType != PacketType.ERROR) {
+					int serverTID = receivePacket.getPort();
+					System.out.println("finishing transfer...");
+					finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+							ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
+				}
 				
 				// end simulation
 				printEndSimulation();
@@ -619,29 +614,22 @@ public class ErrorSimulator {
 				// receive response (should be ERROR)
 				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ERROR (4)");
 								
-				// check to see if server response is correct				
-				if (receivedPacketType != PacketType.ERROR) {
-
-					if (receivePacket.getData()[3] == PacketUtil.ERR_ILLEGAL_OP) {
-						String msg = getErrMessage(receivePacket.getData());
-						System.out.println("Server responded with ERROR code 4 as expected! [PASS]");
-						System.out.printf("error message from packet: \"%s\"", msg);
-					} else {
-						String msg = getErrMessage(receivePacket.getData());
-						System.out.printf("Server responded with ERROR code %d (not 4 as expected) [FAIL]", receivePacket.getData()[3]);
-						System.out.printf("error message from packet: \"%s\"", msg);
-					}
-
-				} else { // not an error packet
-					System.out.println("Server response was not an ERROR packet as expected [FAIL]"); 
-				}
-				
+				// check to see if server response is correct		
+				printSimulationResult(ProcessType.SERVER, PacketUtil.ERR_ILLEGAL_OP);				
 								
 				// pass server response to client
 				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
 				sendPacket.setAddress(clientIP);
 				sendPacket.setPort(clientPort);				
 				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+				
+				// if the last packet received wasn't an error, finish the transfer so client goes back to ready state
+				if (receivedPacketType != PacketType.ERROR) {
+					int serverTID = receivePacket.getPort();
+					System.out.println("finishing transfer...");
+					finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+							ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
+				}
 				
 				// end simulation
 				printEndSimulation(); 
@@ -650,85 +638,235 @@ public class ErrorSimulator {
 			}
 		} else { // packetTypeSelection is DATA, ACK, or ERROR
 			
-			// send request to server as normal
+			// check that the parameters make sense e.g. server cant recv modified ACK if started with WRQ
+			
+			boolean exitSimulation = false;
+			
+			if (receiverProcessSelection == ProcessType.SERVER) {
+				
+				if (startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.ACK) {
+					
+					System.out.println("Wrong packet type received from client! (expected RRQ)");
+					exitSimulation = true;
+					
+				} else if (startingRequestType == PacketType.RRQ && packetTypeSelection == PacketType.DATA) {
+					
+					System.out.println("Wrong packet type received from client! (expected WRQ)");
+					exitSimulation = true;
+				}
+				
+			} else { // receiverProcessSelection == ProcessType.CLIENT
+				
+				if (startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.DATA) {
+					
+					System.out.println("Wrong packet type received from client! (expected RRQ)");
+					exitSimulation = true;
+					
+				} else if (startingRequestType == PacketType.RRQ && packetTypeSelection == PacketType.ACK) {
+					
+					System.out.println("Wrong packet type received from client! (expected WRQ)");
+					exitSimulation = true;
+				}
+				
+			}
+			
+			if (exitSimulation) {
+				System.out.println("cannot proceed, finishing simulation...");
+
+				// send request to server
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);				
+				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+
+				// get server response
+				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+				int serverTID = receivePacket.getPort();
+
+				// send to client
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
+				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+
+				// finish transfer so client goes back to a ready state
+				finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+						ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
+
+				printEndSimulation();
+				return;
+			}
+			
+			// good to proceed, send request to server as normal
 			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);
 		}
+		
+		
 		
 		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
 
 		// receive first server response (DATA 1 if RRQ, ACK 0 if WRQ)
 		String expectPacket = startingRequestType == PacketType.RRQ ? "DATA 1" : "ACK 0";
-		receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, expectPacket);
+		receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, expectPacket);		
 		
 		// keep track of port being used by server thread
 		int serverTID = receivePacket.getPort();
 
 		// if receiver process is CLIENT...
-		// if started with RRQ and packet to modify is DATA, this one can be modified
-		// if started with WRQ and packet to modify is ACK, this one can be modified
-		// otherwise, pass response to client as normal
+		// if started with RRQ, packet to modify is DATA, this one can be modified
+		// if started with WRQ, packet to modify is ACK, this one can be modified		
 		
-		if (receiverProcessSelection == ProcessType.CLIENT && (
-			(startingRequestType == PacketType.RRQ && packetTypeSelection == PacketType.DATA) || 
-			(startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.ACK) ) ) {
+		if (receiverProcessSelection == ProcessType.CLIENT) {
+			if (packetTypeSelection == PacketType.DATA || packetTypeSelection == PacketType.ACK ) {
+				
+				sendPacket = getCorruptedPacket(receivePacket, illegalOpTypeSelection);
+				sendPacket.setAddress(clientIP);
+				sendPacket.setPort(clientPort);
+
+				// send modified packet
+				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "modified " + receivedPacketType.name());			
+
+				// receive response, expecting ERROR 4
+				receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "ERROR (4)");
+
+				// check to see if client response is correct		
+				printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_ILLEGAL_OP);
+
+				// pass client response to server				
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+				sendPacket.setAddress(serverIP);
+				sendPacket.setPort(serverTID);
+				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+
+				// if the last packet received wasn't an error, finish the transfer so client goes back to ready state
+				if (receivedPacketType != PacketType.ERROR) {
+					System.out.println("finishing transfer...");
+					finishTransfer(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID,
+							ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort);
+				}
+
+				// end simulation
+				printEndSimulation(); 
+				return;
+				
+			} else { // selected packet type must be ERROR
+				
+				// fake an error packet sent from server
+				
+				PacketUtil packetUtil = new PacketUtil(clientIP, clientPort);
+				DatagramPacket errPacket = packetUtil.formErrorPacket(PacketUtil.ERR_ACCESS_VIOLATION, 
+						"user does not have permission to access that file");
+				
+				sendPacket = getCorruptedPacket(errPacket, illegalOpTypeSelection);
+
+				// send modified ERROR packet
+				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "modified ERROR (2)");			
+
+				// receive response, expecting ERROR 4
+				receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "ERROR (4)");
+
+				// check to see if client response is correct		
+				printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_ILLEGAL_OP);
+
+				// pass client response to server				
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+				sendPacket.setAddress(serverIP);
+				sendPacket.setPort(serverTID);
+				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+
+				// if the last packet received wasn't an error, finish the transfer so client goes back to ready state
+				if (receivedPacketType != PacketType.ERROR) {
+					System.out.println("finishing transfer...");
+					finishTransfer(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID,
+							ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort);
+				}
+
+				// end simulation
+				printEndSimulation(); 
+				return;				
+			}
+		} 		
+		
+		// send server response to client as normal
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+		sendPacket.setAddress(clientIP);
+		sendPacket.setPort(clientPort);
+		sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+		
+		// get client response
+		receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK/ERROR");
+		
+		// now we know that receiver process is server
+		// simulate based on selected packet type
+		if (packetTypeSelection == PacketType.DATA || packetTypeSelection == PacketType.ACK ) {
 			
 			sendPacket = getCorruptedPacket(receivePacket, illegalOpTypeSelection);
+			sendPacket.setAddress(serverIP);
+			sendPacket.setPort(serverTID);
+
+			// send modified packet to server
+			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "modified " + receivedPacketType.name());			
+
+			// receive response, expecting ERROR 4
+			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ERROR (4)");
+
+			// check to see if server response is correct		
+			printSimulationResult(ProcessType.SERVER, PacketUtil.ERR_ILLEGAL_OP);
+
+			// pass server response to client
+			
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
 			sendPacket.setAddress(clientIP);
 			sendPacket.setPort(clientPort);
 			
-			// send modified packet
-			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "modified" + receivedPacketType.name());			
-			
-			// receive response, expecting ERROR 4
-			receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "ERROR (4)");
-			
-			// check to see if client response is correct				
-			if (receivedPacketType == PacketType.ERROR) {
+			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
 
-				if (receivePacket.getData()[3] == PacketUtil.ERR_ILLEGAL_OP) {
-					String msg = getErrMessage(receivePacket.getData());
-					System.out.println("Client responded with ERROR code 4 as expected! [PASS]");
-					System.out.printf("error message from packet: \"%s\"", msg);
-				} else {
-					String msg = getErrMessage(receivePacket.getData());
-					System.out.printf("Client responded with ERROR code %d (not 4 as expected) [FAIL]", receivePacket.getData()[3]);
-					System.out.printf("error message from packet: \"%s\"", msg);
-				}
+			// if the last packet received wasn't an error, finish the transfer so client goes back to ready state
+			if (receivedPacketType != PacketType.ERROR) {
+				System.out.println("finishing transfer...");
+				finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort,
+						ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
+			}
 
-			} else { // not an error packet
-				System.out.println("Client response was not an ERROR packet as expected [FAIL]"); 
-			}
-			
-			// pass client response to server
-			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-			sendPacket.setAddress(serverIP);
-			sendPacket.setPort(serverTID);
-			try {
-				serverSendRecvSocket.send(sendPacket);
-			} catch (IOException e) {
-				e.printStackTrace();
-				System.exit(1);
-			}
-			
 			// end simulation
 			printEndSimulation(); 
 			return;
 			
-		} 
-		
-		System.out.println("SHOULDN'T BE HERE YET");
-		
-		
-		// send new packet to client
-		System.out.println("sending server response to client...");
-		try {
-			clientSendRecvSocket.send(sendPacket);
-		} catch (IOException e) {
-			e.printStackTrace();
-			System.exit(1);
-		}
+		} else { // selected packet type must be ERROR
+			
+			// fake an error packet sent from client
+			
+			PacketUtil packetUtil = new PacketUtil(serverIP, serverTID);
+			DatagramPacket errPacket = packetUtil.formErrorPacket(PacketUtil.ERR_ACCESS_VIOLATION, 
+					"user does not have permission to access that file");
+			
+			sendPacket = getCorruptedPacket(errPacket, illegalOpTypeSelection);
 
-		printEndSimulation();
+			// send modified ERROR packet
+			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "modified ERROR (2)");			
+
+			// receive response, expecting ERROR 4
+			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ERROR (4)");
+
+			// check to see if server response is correct		
+			printSimulationResult(ProcessType.SERVER, PacketUtil.ERR_ILLEGAL_OP);
+
+			// pass server response to client
+			
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+			sendPacket.setAddress(clientIP);
+			sendPacket.setPort(clientPort);
+
+			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+
+			// if the last packet received wasn't an error, finish the transfer so client goes back to ready state
+			if (receivedPacketType != PacketType.ERROR) {
+				System.out.println("finishing transfer...");
+				finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort,
+						ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
+			}
+
+			// end simulation
+			printEndSimulation(); 
+			return;				
+		}
+		
 	}
 
 	/**
@@ -1007,8 +1145,6 @@ public class ErrorSimulator {
 	 */
 	private void finishTransfer(ProcessType processA, DatagramSocket socketA, InetAddress addrA, int portA,
 					ProcessType processB, DatagramSocket socketB, InetAddress addrB, int portB) { 
-		
-		System.out.println("** FINISHING TRANSFER **");
 		
 		String expectPacketStr = "DATA/ACK/ERROR";		
 		
