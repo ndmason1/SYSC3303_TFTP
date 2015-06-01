@@ -7,6 +7,5 @@ public enum SimulationType {
 	PACKET_LOST,
 	PACKET_DELAY,
 	PACKET_DUPLICATE,
-	SORC_APPRENTICE,
 	NONE			
 }
