@@ -344,7 +344,7 @@ public class Client {
 
         boolean PacketReceived = false;
         int retransmission = 0;
-        while (!PacketReceived && retransmission < 2){
+        while (!PacketReceived && retransmission <= 2){
         	try {			  
         		sendReceiveSocket.receive(receivePacket);
         		PacketReceived = true;
@@ -352,10 +352,17 @@ public class Client {
         		//no response received after 1 sec, resending
         		// TODO  how to resend twice if no response again
         		try {
+        			if (retransmission == 2){
+        				System.out.println("Can not complete sending Request, teminated");
+        				cleanup();
+        				return;
+        			}
+
         			System.out.println("Socket Timeout for response of request packet, resending...");
         			sendReceiveSocket.send(sendPacket);	
         			retransmission ++;
         		} catch (IOException e) {
+ 
         			System.out.println("Error sending request packet!");
         			e.printStackTrace();
         			cleanup();
@@ -369,12 +376,7 @@ public class Client {
         	}
 		}
         
-        if (retransmission == 2){
-        	System.out.println("Can not complete sending Request, teminated");
-        	cleanup();
-        	return;
-        }
-        
+      
 		PacketParser parser = new PacketParser(receivePacket.getAddress(), receivePacket.getPort());
 
 		try{

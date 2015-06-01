@@ -100,7 +100,7 @@ public class Sender {
 			printToConsole(String.format("waiting for ACK %d", blockNum));
 	        boolean PacketReceived = false;
 	        int retransmission = 0;
-	        while (!PacketReceived && retransmission < 2){
+	        while (!PacketReceived && retransmission <= 2){
 	        	try {
 	        		socket.receive(reply);
 	        		PacketReceived = true;
@@ -108,6 +108,10 @@ public class Sender {
 	        		//no response for last Data packet, Data packet may lost, resending...
 	        		printToConsole("Wait ack packet timeout, last data packet may lost, resending...");
 	    			try {
+	    		        if (retransmission == 2){
+	    		        	System.out.println("Can not complete sending Request, teminated");
+	    		        	return;
+	    		        }
 	    				socket.send(sendPacket);
 	    				retransmission ++;
 	    			} catch (IOException e) {
@@ -118,10 +122,6 @@ public class Sender {
 	        	}     
 	        }
 	        
-	        if (retransmission == 2){
-	        	System.out.println("Can not complete sending Request, teminated");
-	        	return;
-	        }
 
 			// parse ACK to ensure it is correct before continuing
 			try {

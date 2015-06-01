@@ -157,7 +157,7 @@ public class Receiver
 			while (!done) {
 				boolean PacketReceived = false;
 				int retransmission = 0;
-				while (!PacketReceived && retransmission < 2){
+				while (!PacketReceived && retransmission <= 2){
 					// wait for response
 					printToConsole("waiting for next DATA segment...");
 					try {			  
@@ -167,6 +167,10 @@ public class Receiver
 					} catch(SocketTimeoutException e){
 						//response data packet not received, last ack packet may lost, resending...
 						try {
+					        if (retransmission == 2){
+					        	System.out.println("Can not complete tranfer file, teminated");
+					        	return;
+					        }
 							socket.send(sendPacket);
 							retransmission ++;
 						} catch (IOException ew) {
@@ -178,10 +182,7 @@ public class Receiver
 						System.exit(1);
 					}
 				}
-		        if (retransmission == 2){
-		        	System.out.println("Can not complete tranfer file, teminated");
-		        	return;
-		        }
+
 		        
 				printToConsole(String.format("DATA %d received", blockNum));
 				
