@@ -55,6 +55,7 @@ public class Sender {
 	}
 
 	public void sendFile(File theFile) throws TFTPException {
+		
 		try {
 			fileReader = new FileInputStream(theFile);
 		} catch (FileNotFoundException e) {
@@ -68,11 +69,14 @@ public class Sender {
 		}
 		
 		int blockNum = 1;
+		int oldBlockNum = 1;
+		boolean duplicatePacket = false;
 
 		byte[] sendBuf = new byte[512]; // need to make this exactly our block size so we only read that much
 		byte[] recvBuf = new byte[PacketUtil.BUF_SIZE];
 
 		boolean done = false;
+
 		do		
 		{
 			try {
@@ -86,12 +90,13 @@ public class Sender {
 			if (bytesRead < 512) {
 				done = true;
 			}
+			
 			DatagramPacket sendPacket = packetUtil.formDataPacket(sendBuf, bytesRead, blockNum);
 
 			printToConsole(String.format("Sending DATA block %d with %d byte payload.", blockNum, bytesRead));
 
 			try {
-				socket.send(sendPacket);
+				if (!duplicatePacket) {socket.send(sendPacket);} // if duplicate packet is false we ignore and don't send anything.
 			} catch (IOException e) {
 				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}
@@ -112,8 +117,8 @@ public class Sender {
 	        		//no response for last Data packet, Data packet maybe lost, resending...
 	        		printToConsole("Error: Timed out retreiving ACK Packet, Possible data packet loss, resending...");
 	    			try {
-	    		        if (retransmission == 2){
-	    		        	System.out.println("Can not complete sending Request, teminated");
+	    		        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+	    		        	System.out.println("Can not complete sending Request, terminated");
 	    		        	return;
 	    		        }
 	    				socket.send(sendPacket);
@@ -127,16 +132,13 @@ public class Sender {
 	        }
 	        
 	        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-	        	
-	        	//TO:DO Throw proper error using error codes?
-	        	System.out.println("Can not complete sending Request, teminated");
+	        	System.out.println("Can not complete sending Request, terminated");
 	        	return;
 	        }
 
-
 			// parse ACK to ensure it is correct before continuing
 			try {
-				parser.parseAckPacket(reply, blockNum);
+				duplicatePacket = parser.parseAckPacket(reply, blockNum);
 			} catch (ErrorReceivedException e) {
 				// the other side sent an error packet, so in most cases don't send a response
 
@@ -180,14 +182,6 @@ public class Sender {
 				// rethrow so the owner of this Sender knows whats up
 				throw e;
 			}
-
-			// verify ack
-			int ackNum = packetUtil.parseAckPacket(reply);
-			
-			if (ackNum != blockNum) {
-				// TODO: handle out of sequence block
-			}
-
 			blockNum++;
 
 		} while (!done);

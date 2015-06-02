@@ -223,6 +223,7 @@ public class Receiver
 				throw e;
 			}
 
+			// If duplicate data packet we will not write to file
 			if (duplicatePacket){
 				blockNum = oldBlockNum;		
 			}
