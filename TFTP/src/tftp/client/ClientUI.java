@@ -148,12 +148,10 @@ public class ClientUI {
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				System.out.println("Could not complete request, please try again.");
 				return;		
-			} catch (TFTPException e) {
-				if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID) {
-					System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
-					System.out.println("Could not complete request, please try again.");
-					return;
-				}
+			} catch (TFTPException e) {				
+				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());				
+				System.out.println("Could not complete request, please try again.");
+				return;
 			}
 			System.out.println("Read of file " + client.getFilename() + " into directory " + client.getDirectory() + " finished.\n");
 			

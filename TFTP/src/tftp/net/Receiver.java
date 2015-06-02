@@ -17,6 +17,7 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
@@ -64,31 +65,16 @@ public class Receiver
 
 		int blockNum = 1;
 		int oldBlockNum = 1;
+		int receivedBlockNum = 0;
 		boolean duplicatePacket = false;
 		
 		// parse the first DATA packet and see if we even need to continue
 		try {
 			printToConsole("RECEIVER: about to parse DATA packet, expected block number " + oldBlockNum);
 			packetParser.parseDataPacket(initPacket, oldBlockNum);
-			blockNum = ErrorSimUtil.getBlockNumber(initPacket);
 
 		} catch (ErrorReceivedException e) {
-			// the other side sent an error packet, so in most cases don't send a response
-
-			// we could have gotten an error packet from an unknown TID, so we need to respond to that TID
-			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-
-				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-				// address packet to the unknown TID
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-						initPacket.getAddress(), initPacket.getPort());
-				try {			   
-					socket.send(errPacket);
-				} catch (IOException ex) { 
-					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
-				}
-			}
-
+			// the other side sent an error packet, don't send a response
 			// rethrow so the owner of this Receiver knows whats up
 			throw e;
 
@@ -112,8 +98,10 @@ public class Receiver
 				throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}
 
-			// rethrow so the owner of this Receiver knows whats up
-			throw e;
+			// keep going if error was unknown TID
+			// otherwise, rethrow so the client UI can print a message
+			if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID)
+				throw e;
 		}
 
 		createFile(aFile);
@@ -143,6 +131,11 @@ public class Receiver
 			while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
 				// wait for response
 				printToConsole("waiting for next DATA segment...");
+				
+				// zero the receive buffer so no lingering data is detected
+				Arrays.fill(data, (byte)0);
+				receivePacket = new DatagramPacket(data, data.length);
+				
 				try {			  
 					socket.receive(receivePacket);
 					PacketReceived = true;
@@ -169,8 +162,10 @@ public class Receiver
 				System.out.println("Can not complete tranfer file, terminated");
 				return;
 			}
+			
+			receivedBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
 
-			printToConsole(String.format("DATA %d received", blockNum));
+			printToConsole(String.format("DATA %d received", receivedBlockNum));
 			
 			oldBlockNum = blockNum;
 			// increment block number so we can check if received packet has expected block number
@@ -178,34 +173,13 @@ public class Receiver
 
 			// parse the response packet to ensure it is correct before continuing
 			try {
-				printToConsole("RECEIVER: about to parse DATA packet with block number " + blockNum);
+				printToConsole("RECEIVER: about to parse DATA packet, expected block number " + blockNum);
 				duplicatePacket = packetParser.parseDataPacket(receivePacket, blockNum);
 
 			} catch (ErrorReceivedException e) {
-				// the other side sent an error packet, so in most cases don't send a response
-
-				// we could have gotten an error packet from an unknown TID, so we need to respond to that TID
-				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-
-					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-					// address packet to the unknown TID
-					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-							receivePacket.getAddress(), receivePacket.getPort());
-					
-					try {			   
-						socket.send(errPacket);
-					} catch (IOException ex) { 
-						// TODO fix resource leak
-						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
-					}
-					
-					// rethrow so the owner of this Receiver knows whats up 
-					// unless Unknown TID, in which case we continue receiving
-					if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID)
-						throw e;
-				}
-
+				// the other side sent an error packet, don't send a response
 				// rethrow so the owner of this Receiver knows whats up
+				printToConsole("ERROR packet received from sending side!");				
 				throw e;
 
 			} catch (TFTPException e) {
@@ -227,16 +201,27 @@ public class Receiver
 				} catch (IOException ex) {			   
 					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 				}
-
-				// rethrow so the owner of this Receiver knows whats up
-				throw e;
+				
+				// keep going if error was unknown TID
+				// otherwise, rethrow so the client UI can print a message
+				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+					oldBlockNum--;
+					blockNum--;
+					continue;
+				}
+				else
+					throw e;
 			}
 
 			// If duplicate data packet we will not write to file
 			if (duplicatePacket){
+				printToConsole("RECEIVER: DATA packet is duplicate, actual block number " 
+						+ receivedBlockNum);
 				blockNum = oldBlockNum;		
 			}
 			else{
+				printToConsole("RECEIVER: DATA packet is valid, actual block number " 
+						+ receivedBlockNum);
 				checkDiskFull(aFile, receivePacket); // First check if disk is full
 				writeToFile(data, receivePacket); 	 // If not write the data portion to the file
 				
@@ -245,7 +230,7 @@ public class Receiver
 				}
 
 				// send ACK
-				blockNum = packetUtil.parseDataPacket(receivePacket);
+				//blockNum = packetUtil.parseDataPacket(receivePacket);
 			}
 			
 			// BlockNum is verified, sending old block num if duplication of packet occured

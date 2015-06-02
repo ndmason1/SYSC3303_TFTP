@@ -25,6 +25,8 @@ import tftp.net.PacketParser;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
 import tftp.net.Sender;
+import tftp.sim.ErrorSimUtil;
+import tftp.sim.ErrorSimulator;
 import tftp.exception.*;
 
 /**
@@ -52,7 +54,8 @@ public class Client {
 			sendReceiveSocket = new DatagramSocket();
 			
 			//set socket timeout to 2 sec
-			sendReceiveSocket.setSoTimeout(2*1000);
+			//sendReceiveSocket.setSoTimeout(2*1000);
+			sendReceiveSocket.setSoTimeout(ErrorSimulator.TIMEOUT_MS);
 		} catch (SocketException se) {
 			se.printStackTrace();
 			System.exit(1);
@@ -72,7 +75,8 @@ public class Client {
 	public Client(String file, String aMode) {
 		try {
 			sendReceiveSocket = new DatagramSocket();
-			sendReceiveSocket.setSoTimeout(5*1000);
+			//sendReceiveSocket.setSoTimeout(5*1000);
+			sendReceiveSocket.setSoTimeout(ErrorSimulator.TIMEOUT_MS);
 		} catch (SocketException se) {
 			se.printStackTrace();
 			System.exit(1);
@@ -161,7 +165,7 @@ public class Client {
 		// get server response - the port it is sent from should be used as the server TID
         boolean PacketReceived = false;
         int retransmission = 0;
-        while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
+        while (!PacketReceived && retransmission < DEFAULT_RETRY_TRANSMISSION){
         	try {			  
         		sendReceiveSocket.receive(receivePacket);
         		PacketReceived = true;
@@ -187,9 +191,7 @@ public class Client {
 		}
         
         if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-        	System.out.println("Can not complete sending Request, teminated");
-        	cleanup();
-        	return;
+        	throw new TFTPException("maximum number of retransmissions reached, aborting operation", PacketUtil.ERR_UNDEFINED);
         }
         
 		PacketParser parser = new PacketParser(targetIP, receivePacket.getPort());
@@ -198,18 +200,7 @@ public class Client {
 			//receive first data packet with block #1
 			parser.parseDataPacket(receivePacket, 1);
 		} catch(ErrorReceivedException e) {
-			// the other side sent an error packet, so in most cases don't send a response
-
-			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-				// send error packet to the unknown TID
-				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-				try {			   
-					sendReceiveSocket.send(errPacket);
-				} catch (IOException ex) { 
-					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
-				}
-			}
-
+			// the other side sent an error packet, don't send a response
 			// rethrow so the client UI can print a message
 			throw e;
 
@@ -235,8 +226,10 @@ public class Client {
 				return;
 			}
 
-			// rethrow so the client UI can print a message
-			throw e;
+			// keep going if error was unknown TID
+			// otherwise, rethrow so the client UI can print a message
+			if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID)
+				throw e;
 		}
 
 		// request is good, set up a receiver to proceed with the transfer
@@ -315,18 +308,7 @@ public class Client {
 		try{
 			parser.parseAckPacket(receivePacket, 0);
 		} catch(ErrorReceivedException e) {
-			// the other side sent an error packet, so in most cases don't send a response
-
-			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-				// send error packet to the unknown TID
-				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-				try {			   
-					sendReceiveSocket.send(errPacket);
-				} catch (IOException ex) { 
-					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
-				}
-			}
-
+			// the other side sent an error packet, don't send a response
 			// rethrow so the client UI can print a message
 			throw e;
 

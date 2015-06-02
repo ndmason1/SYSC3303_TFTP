@@ -3,6 +3,8 @@ package tftp.sim;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
+import java.net.SocketException;
+import java.net.SocketTimeoutException;
 
 import tftp.net.PacketUtil;
 
@@ -256,6 +258,14 @@ public class ErrorSimUtil {
 		ErrorSimUtil.printOpcode(receivePacket);
 		
 		return receivePacket;
+	}
+	
+	public static void setSocketTimeout(DatagramSocket socket, int timeoutMs) {
+		try {
+			socket.setSoTimeout(timeoutMs);
+		} catch (SocketException e) {
+			e.printStackTrace();
+		}
 	}
 
 }

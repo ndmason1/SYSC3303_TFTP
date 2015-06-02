@@ -141,22 +141,7 @@ public class Sender {
 			try {
 				duplicatePacket = parser.parseAckPacket(reply, blockNum);
 			} catch (ErrorReceivedException e) {
-				// the other side sent an error packet, so in most cases don't send a response
-
-				// we could have gotten an error packet from an unknown TID, so we need to respond to that TID
-				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-					
-					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-					// address packet to the unknown TID
-					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-							reply.getAddress(), reply.getPort());
-					try {			   
-						socket.send(errPacket);
-					} catch (IOException ex) { 
-						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
-					}
-				} 		
-				
+				// the other side sent an error packet, don't send a response				
 				// rethrow so the owner of this Sender knows whats up
 				throw e;
 				

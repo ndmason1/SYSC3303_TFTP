@@ -121,7 +121,8 @@ public class ReadHandlerThread extends WorkerThread {
 		// request is good if we made it here
 		// read request, so start a file transfer
 		Sender s = new Sender(this, sendReceiveSocket, clientPort);
-		try {			
+		try {
+			printToConsole("Sender created");
 			s.sendFile(f);
 		} catch (TFTPException e) {
 			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
