@@ -517,11 +517,8 @@ public class ErrorSimulator {
 	 * modified packet. 
 	 */
 	private void simulateIllegalOperation() {
-<<<<<<< HEAD
-=======
 		
 		System.out.println("==== EXECUTING SIMULATION ====");
->>>>>>> 62f467077f30821ff999d698fecb5850e09fe45f
 
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
 		receivePacket = new DatagramPacket(data, data.length);			

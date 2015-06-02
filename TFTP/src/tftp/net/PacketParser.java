@@ -98,7 +98,7 @@ public class PacketParser {
 	 * @param  packet	the packet containing a data block
 	 * @throws 			TFTPPacketException if the packet is badly formatted/corrupted 
 	 */
-	public void parseDataPacket(DatagramPacket packet, int expectedBlockNum) throws TFTPException {
+	public boolean parseDataPacket(DatagramPacket packet, int expectedBlockNum) throws TFTPException {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
@@ -114,16 +114,22 @@ public class PacketParser {
 		
 		// check that the block number is what we expect
 		int blockNum = PacketUtil.getBlockNumberInt(data[2], data[3]);
-		if (blockNum != expectedBlockNum) {
-			// TODO: handle this error - not sure which type of error this qualifies as 
-			// SORCERER APPRENTICE!
+		if (blockNum > expectedBlockNum) {
+			// Unexpected Data Packet throw exception
+			throw new TFTPException("Unexpected Block Number", PacketUtil.ERR_ILLEGAL_OP);
+		}
+		if (blockNum < expectedBlockNum) {
+			//Duplicate packet returns true
+			return true;
 		}
 		
 		// check that there is no "extra" data beyond this packet's set length		
 		for (int i = packet.getLength(); i < data.length; i++) {
 			if (data[i] != 0) 
 				throw new TFTPException("data found beyond packet length", PacketUtil.ERR_ILLEGAL_OP);
-		}			
+		}
+		
+		return false;
 	}
 	
 	/**
@@ -132,7 +138,7 @@ public class PacketParser {
 	 * @param  packet	the packet containing an ACK in response to a data block
 	 * @throws 			TFTPPacketException if the packet is badly formatted/corrupted 
 	 */
-	public void parseAckPacket(DatagramPacket packet, int expectedBlockNum) throws TFTPException {
+	public boolean parseAckPacket(DatagramPacket packet, int expectedBlockNum) throws TFTPException {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
@@ -148,13 +154,19 @@ public class PacketParser {
 		
 		// check that the block number is what we expect
 		int blockNum = PacketUtil.getBlockNumberInt(data[2], data[3]);
-		if (blockNum != expectedBlockNum) {
-			// TODO: handle this error - not sure which type of error this qualifies as
-			// SORCERER APPRENTICE!
+		if (blockNum > expectedBlockNum) {
+			//Unexpected ACK packet return 1
+			throw new TFTPException("Unexpected ACK packet ", PacketUtil.ERR_ILLEGAL_OP);
+		}
+		if (blockNum < expectedBlockNum){
+			//Duplicate ACK packet return 2
+			return true;
 		}
 		
 		if (packet.getLength() > 4)
 			throw new TFTPException("incorrect packet length", PacketUtil.ERR_ILLEGAL_OP);
+		
+		return false;
 	}
 	
 	/**
