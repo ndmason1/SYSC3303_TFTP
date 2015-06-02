@@ -34,6 +34,7 @@ import tftp.exception.*;
  */
 public class Client {	 
 
+	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
 	//Private variables
 	private DatagramSocket sendReceiveSocket;
 	private DatagramPacket sendPacket, receivePacket;
@@ -55,16 +56,6 @@ public class Client {
 		} catch (SocketException se) {
 			se.printStackTrace();
 			System.exit(1);
-		}
-
-		try {
-			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\client\\ClientFiles")));
-		} catch (IOException e) {
-			System.out.println("Couldn't set up directory for client files! terminating");
-			e.printStackTrace();
-			cleanup();
-			System.exit(1);
-
 		}
 
 		try {
@@ -90,14 +81,6 @@ public class Client {
 		setFilename(file);
 		setMode(aMode);
 
-		try {
-			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\client\\ClientFiles")));
-		} catch (IOException e) {			
-			System.out.println("Couldn't set up directory for client files! terminating");
-			e.printStackTrace();
-			cleanup();
-			System.exit(1);
-		}
 		setFile(new File(getDirectory().concat("\\" + getFilename())));
 
 		try {
@@ -153,52 +136,6 @@ public class Client {
 		}
 	}
 
-	// phasing this method out, PacketUtil's formRrqPacket() will be used instead
-	private byte[] prepareReadRequestPayload() {		
-
-		int msgLength = getFilename().length() + getMode().length() + 4; 
-		byte msg[] = new byte[msgLength];
-
-		// preamble
-		msg[0] = 0x00;
-		msg[1] = 0x01;
-
-		// filename
-		byte[] fbytes = getFilename().getBytes(); 
-		System.arraycopy(fbytes, 0, msg, 2, fbytes.length);
-		msg[fbytes.length + 2] = 0x00;
-
-		// mode
-		byte[] mbytes = getMode().getBytes(); 
-		System.arraycopy(mbytes, 0, msg, 3+fbytes.length, mbytes.length);
-		msg[fbytes.length + mbytes.length + 3] = 0x00;
-
-		return msg;
-	}
-
-	// phasing this method out, PacketUtil's formWrqPacket() will be used instead
-	private byte[] prepareWriteRequestPayload() {
-
-		int msgLength = getFilename().length() + getMode().length() + 4; 
-		byte msg[] = new byte[msgLength];
-
-		// preamble
-		msg[0] = 0x00;
-		msg[1] = 0x02;
-
-		// filename
-		byte[] fbytes = getFilename().getBytes(); 
-		System.arraycopy(fbytes, 0, msg, 2, fbytes.length);
-		msg[fbytes.length + 2] = 0x00;
-
-		// mode
-		byte[] mbytes = getMode().getBytes(); 
-		System.arraycopy(mbytes, 0, msg, 3+fbytes.length, mbytes.length);
-		msg[fbytes.length + mbytes.length + 3] = 0x00;
-
-		return msg;
-	}	
-
 	public void sendReadRequest() throws TFTPException{		
 
 		System.out.println("Starting read of file " + getFilename() + " from server...");
@@ -224,7 +161,7 @@ public class Client {
 		// get server response - the port it is sent from should be used as the server TID
         boolean PacketReceived = false;
         int retransmission = 0;
-        while (!PacketReceived && retransmission < 2){
+        while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
         	try {			  
         		sendReceiveSocket.receive(receivePacket);
         		PacketReceived = true;
@@ -249,7 +186,7 @@ public class Client {
         	}
 		}
         
-        if (retransmission == 2){
+        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
         	System.out.println("Can not complete sending Request, teminated");
         	cleanup();
         	return;
@@ -311,14 +248,9 @@ public class Client {
 
 		
 		System.out.println("Starting write of file : " + getFilename() + " to server...");
-		byte[] payload = prepareWriteRequestPayload();
-
-
-		System.out.println("Starting write of file + " + getFilename() + " from server...");
 		
 		// set up PacketUtil object to generate packets with
 		PacketUtil packetUtil = new PacketUtil(targetIP, targetPort);		
-
 
 		checkValidWriteOperation();
 		// create send packet
@@ -340,7 +272,8 @@ public class Client {
 
         boolean PacketReceived = false;
         int retransmission = 0;
-        while (!PacketReceived && retransmission < 2){
+        
+        while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
         	try {			  
         		sendReceiveSocket.receive(receivePacket);
         		PacketReceived = true;
@@ -348,10 +281,17 @@ public class Client {
         		//no response received after 1 sec, resending
         		// TODO  how to resend twice if no response again
         		try {
+        			if (retransmission == 2){
+        				System.out.println("Can not complete sending Request, teminated");
+        				cleanup();
+        				return;
+        			}
+
         			System.out.println("Socket Timeout for response of request packet, resending...");
         			sendReceiveSocket.send(sendPacket);	
         			retransmission ++;
         		} catch (IOException e) {
+ 
         			System.out.println("Error sending request packet!");
         			e.printStackTrace();
         			cleanup();
@@ -365,8 +305,8 @@ public class Client {
         	}
 		}
         
-        if (retransmission == 2){
-        	System.out.println("Can not complete sending Request");
+        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+        	System.out.println("Can not complete sending Request, terminated");
         	return;
         }
         

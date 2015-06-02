@@ -28,7 +28,6 @@ import tftp.server.thread.WorkerThreadFactory;
  */
 public class Server {
 	
-	
 	public static final int SERVER_PORT = 69; 
 	
 	//private variables
@@ -39,7 +38,7 @@ public class Server {
 	private HashSet<WorkerThread> activatedThreads;
 	private boolean acceptNewConnections;
 	private int threadCount;
-	private String directory;	
+	private String directory;
 	
 	public Server()
 	{
@@ -72,8 +71,7 @@ public class Server {
 
 			// wait for request to come in
 			try {
-				receiveSocket.receive(receivePacket);
-				
+				receiveSocket.receive(receivePacket);				
 			} catch (SocketException e) { 
 				// likely the socket was closed because the server is shutting down
 				System.out.printf("Stopped listening on port %d.\n", SERVER_PORT);
@@ -116,4 +114,5 @@ public class Server {
 	
 	//Server set functions
 	public void setDirectory(String aDirectory){directory = aDirectory;}
+	
 }
