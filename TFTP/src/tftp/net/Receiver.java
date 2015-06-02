@@ -171,6 +171,10 @@ public class Receiver
 					} catch(SocketTimeoutException e){
 						//response data packet not received, last ack packet may lost, resending...
 						try {
+					        if (retransmission == 2){
+					        	System.out.println("Can not complete tranfer file, teminated");
+					        	return;
+					        }
 							socket.send(sendPacket);
 							retransmission++;
 						} catch (IOException ew) {
@@ -183,8 +187,6 @@ public class Receiver
 					}
 				}
 		        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-		        	
-		        	//same here throw proper error code and message..
 		        	System.out.println("Can not complete tranfer file, terminated");
 		        	return;
 		        }
@@ -281,8 +283,12 @@ public class Receiver
 
 				// send ACK
 				blockNum = packetUtil.parseDataPacket(receivePacket);
+<<<<<<< HEAD
 				// TODO verify block num
 				sendPacket = packetUtil.formAckPacket(blockNum);
+=======
+				sendPacket = packetUtil.formAckPacket(blockNum);
+>>>>>>> 62f467077f30821ff999d698fecb5850e09fe45f
 				printToConsole(String.format("sending ACK %d", blockNum));		
 				
 
@@ -306,7 +312,7 @@ public class Receiver
 			fileWriter.flush();
 			fileWriter.close();
 		} catch (IOException e) {
-			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+			throw new TFTPException("Error closing FileOutputStream: "+e.getMessage(), PacketUtil.ERR_UNDEFINED);
 		}
 	}
 	

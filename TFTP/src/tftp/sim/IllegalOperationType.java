@@ -1,5 +1,6 @@
 package tftp.sim;
 
+//possible ways a packet can trigger an illegal op error
 public enum IllegalOperationType {
 	OPCODE, 
 	FILENAME, 

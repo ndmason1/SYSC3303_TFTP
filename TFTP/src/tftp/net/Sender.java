@@ -78,7 +78,7 @@ public class Sender {
 			try {
 				bytesRead = fileReader.read(sendBuf);
 			} catch (IOException e) {
-				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
+				throw new TFTPException("Error reading data from file: "+e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}
 			if (bytesRead == -1) {
 				bytesRead = 0;				
@@ -112,6 +112,10 @@ public class Sender {
 	        		//no response for last Data packet, Data packet maybe lost, resending...
 	        		printToConsole("Error: Timed out retreiving ACK Packet, Possible data packet loss, resending...");
 	    			try {
+	    		        if (retransmission == 2){
+	    		        	System.out.println("Can not complete sending Request, teminated");
+	    		        	return;
+	    		        }
 	    				socket.send(sendPacket);
 	    				retransmission++;
 	    			} catch (IOException e) {
@@ -128,6 +132,7 @@ public class Sender {
 	        	System.out.println("Can not complete sending Request, teminated");
 	        	return;
 	        }
+
 
 			// parse ACK to ensure it is correct before continuing
 			try {

@@ -1,5 +1,10 @@
 package tftp.sim;
 
+// TFTP packet types
 public enum PacketType {
-	RRQ, WRQ, DATA, ACK, ERROR
+	RRQ, 
+	WRQ, 
+	DATA, 
+	ACK, 
+	ERROR
 }

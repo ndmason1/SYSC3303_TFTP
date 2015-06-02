@@ -27,7 +27,14 @@ import tftp.server.thread.WorkerThreadFactory;
  *
  */
 public class Server {
+<<<<<<< HEAD
 		
+=======
+	
+	
+	public static final int SERVER_PORT = 69; 
+	
+>>>>>>> 62f467077f30821ff999d698fecb5850e09fe45f
 	//private variables
 	private DatagramPacket receivePacket;
 	private DatagramSocket receiveSocket;
@@ -41,7 +48,7 @@ public class Server {
 	public Server()
 	{
 		try {
-			receiveSocket = new DatagramSocket(69);
+			receiveSocket = new DatagramSocket(SERVER_PORT);
 		} catch (SocketException se) {
 			se.printStackTrace();
 			System.exit(1);
@@ -56,6 +63,7 @@ public class Server {
 	}
 
 	public void cleanup() {
+		// close the socket
 		receiveSocket.close();
 	}
 
@@ -66,11 +74,20 @@ public class Server {
 			receivePacket = new DatagramPacket(data, data.length);			
 			receivePacket.getLength();
 
-			// wait for request to come  in
+			// wait for request to come in
 			try {
 				receiveSocket.receive(receivePacket);
+<<<<<<< HEAD
 		
+=======
+				
+			} catch (SocketException e) { 
+				// likely the socket was closed because the server is shutting down
+				System.out.printf("Stopped listening on port %d.\n", SERVER_PORT);
+				
+>>>>>>> 62f467077f30821ff999d698fecb5850e09fe45f
 			} catch (IOException e) {
+				System.out.println("IOexception listening for packets in main server thread");
 				e.printStackTrace();
 				System.exit(1);
 			}
@@ -88,17 +105,18 @@ public class Server {
 		}
 	}
 
-	// TODO: better way to stop threads, likely using interrupt()
+	
 	public void finishProcessing() {
 		acceptNewConnections = false;
-		for (Thread t : activatedThreads) {
+		for (Thread t : activatedThreads) {			
 			try {
+				// wait for threads to finish - those blocked while waiting to receive packet should time out
 				t.join();
 			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				System.out.printf("Thread %s was interrupted and did not finish processing\n", t.getName());				
 			}
 		}
+		cleanup();
 	}
 	
 	//Server get functions
