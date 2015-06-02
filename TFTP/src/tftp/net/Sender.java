@@ -69,7 +69,6 @@ public class Sender {
 		}
 		
 		int blockNum = 1;
-		int oldBlockNum = 1;
 		boolean duplicatePacket = false;
 
 		byte[] sendBuf = new byte[512]; // need to make this exactly our block size so we only read that much
@@ -182,7 +181,11 @@ public class Sender {
 				// rethrow so the owner of this Sender knows whats up
 				throw e;
 			}
-			blockNum++;
+			
+			if (!duplicatePacket){
+				blockNum++;
+			}
+			
 
 		} while (!done);
 	}
