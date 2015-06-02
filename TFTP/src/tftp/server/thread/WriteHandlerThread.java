@@ -53,26 +53,9 @@ public class WriteHandlerThread extends WorkerThread {
 			filename = packetParser.parseWRQPacket(reqPacket);
 			
 		} catch (ErrorReceivedException e) {
-			// the other side sent an error pack``````````````` (%d) %s\n", e.getErrorCode(), e.getMessage()));
-
-			// we could have gotten an error packet from an unknown TID, so we need to respond to that TID
-			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-				
-				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-				// address packet to the unknown TID
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-						receivePacket.getAddress(), receivePacket.getPort());
-				try {			   
-					sendReceiveSocket.send(errPacket);
-				} catch (IOException ex) { 
-					printToConsole("Error occured sending ERROR packet to unknown TID");
-					ex.printStackTrace();
-					cleanup();
-					return;
-				}
-			}
-			
-			printToConsole("request cannot be processed, ending this thread");			
+			// the other side sent an error pack``````````````` (%d) %s\n", e.getErrorCode(), e.getMessage()));			
+			printToConsole("ERROR packet received from client!");
+			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 			return;
 			
 		} catch (TFTPException e) {

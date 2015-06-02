@@ -17,10 +17,12 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
 import tftp.server.thread.WorkerThread;
+import tftp.sim.ErrorSimUtil;
 
 public class Sender {
 	
@@ -55,7 +57,6 @@ public class Sender {
 	}
 
 	public void sendFile(File theFile) throws TFTPException {
-		
 		try {
 			fileReader = new FileInputStream(theFile);
 		} catch (FileNotFoundException e) {
@@ -78,6 +79,8 @@ public class Sender {
 
 		do		
 		{
+			// zero the send buffer so no lingering data is sent
+			Arrays.fill(sendBuf, (byte)0);
 			try {
 				bytesRead = fileReader.read(sendBuf);
 			} catch (IOException e) {
@@ -93,7 +96,6 @@ public class Sender {
 			DatagramPacket sendPacket = packetUtil.formDataPacket(sendBuf, bytesRead, blockNum);
 
 			printToConsole(String.format("Sending DATA block %d with %d byte payload.", blockNum, bytesRead));
-
 			try {
 				if (!duplicatePacket) {socket.send(sendPacket);} // if duplicate packet is false we ignore and don't send anything.
 			} catch (IOException e) {
@@ -110,7 +112,7 @@ public class Sender {
 	        
 	        while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
 	        	try {
-	        		socket.receive(reply);
+	        		socket.receive(reply);	        		
 	        		PacketReceived = true;
 	        	} catch (SocketTimeoutException ex){
 	        		//no response for last Data packet, Data packet maybe lost, resending...
@@ -139,22 +141,7 @@ public class Sender {
 			try {
 				duplicatePacket = parser.parseAckPacket(reply, blockNum);
 			} catch (ErrorReceivedException e) {
-				// the other side sent an error packet, so in most cases don't send a response
-
-				// we could have gotten an error packet from an unknown TID, so we need to respond to that TID
-				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-					
-					DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-					// address packet to the unknown TID
-					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-							reply.getAddress(), reply.getPort());
-					try {			   
-						socket.send(errPacket);
-					} catch (IOException ex) { 
-						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
-					}
-				}
-				
+				// the other side sent an error packet, don't send a response				
 				// rethrow so the owner of this Sender knows whats up
 				throw e;
 				
@@ -164,6 +151,7 @@ public class Sender {
 				DatagramPacket errPacket = null;
 				
 				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+					printToConsole("SENDER: received packet with unknown TID");
 					// address packet to the unknown TID
 					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
 							reply.getAddress(), reply.getPort());						
@@ -188,6 +176,7 @@ public class Sender {
 			
 
 		} while (!done);
+		
 	}
 	
 	private void printToConsole(String message) {

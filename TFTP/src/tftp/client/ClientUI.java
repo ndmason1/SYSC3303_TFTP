@@ -13,6 +13,9 @@ import java.util.Scanner;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
+import tftp.net.PacketUtil;
+import tftp.server.Server;
+import tftp.sim.ErrorSimulator;
 
 public class ClientUI {
 
@@ -35,12 +38,12 @@ public class ClientUI {
 		
 			if (errorSimulator.toLowerCase().equals("yes") || errorSimulator.toLowerCase().equals("y"))
 			{
-				client.setPortNum(78);
+				client.setPortNum(ErrorSimulator.LISTEN_PORT);
 				check = false;
 			}
 			if (errorSimulator.toLowerCase().equals("no") || errorSimulator.toLowerCase().equals("n"))
 			{
-				client.setPortNum(69);
+				client.setPortNum(Server.SERVER_PORT);
 				check = false;
 			}
 		}
@@ -145,8 +148,8 @@ public class ClientUI {
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				System.out.println("Could not complete request, please try again.");
 				return;		
-			} catch (TFTPException e) {
-				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
+			} catch (TFTPException e) {				
+				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());				
 				System.out.println("Could not complete request, please try again.");
 				return;
 			}
@@ -162,7 +165,7 @@ public class ClientUI {
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				System.out.println("Could not complete request, please try again.");
 				return;			
-			} catch (TFTPException e) {
+			} catch (TFTPException e) {				
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				System.out.println("Could not complete request, please try again.");
 				return;
@@ -171,9 +174,11 @@ public class ClientUI {
 			try{
 			    client.sendWriteRequest();
 			}catch (TFTPException e){
-				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
-				System.out.println("Could not complete request, please try again.");
-				return;
+				if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID) {
+					System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
+					System.out.println("Could not complete request, please try again.");
+					return;
+				}
 			}
 			
 			System.out.println("Write of file " + client.getFilename() + " from directory " + client.getDirectory() + " finished.\n");
