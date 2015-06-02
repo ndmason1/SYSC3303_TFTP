@@ -24,6 +24,8 @@ import tftp.server.thread.WorkerThread;
 
 public class Receiver
 {    
+	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
+	
 	private DatagramSocket socket;
 
 	private InetAddress senderIP;
@@ -155,9 +157,11 @@ public class Receiver
 			boolean done = initPacket.getLength() < 516;		
 
 			while (!done) {
+				
 				boolean PacketReceived = false;
 				int retransmission = 0;
-				while (!PacketReceived && retransmission < 2){
+				
+				while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
 					// wait for response
 					printToConsole("waiting for next DATA segment...");
 					try {			  
@@ -168,7 +172,7 @@ public class Receiver
 						//response data packet not received, last ack packet may lost, resending...
 						try {
 							socket.send(sendPacket);
-							retransmission ++;
+							retransmission++;
 						} catch (IOException ew) {
 							throw new TFTPException(ew.getMessage(), PacketUtil.ERR_UNDEFINED);
 						}
@@ -178,8 +182,10 @@ public class Receiver
 						System.exit(1);
 					}
 				}
-		        if (retransmission == 2){
-		        	System.out.println("Can not complete tranfer file, teminated");
+		        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+		        	
+		        	//same here throw proper error code and message..
+		        	System.out.println("Can not complete tranfer file, terminated");
 		        	return;
 		        }
 		        

@@ -116,6 +116,7 @@ public class PacketParser {
 		int blockNum = PacketUtil.getBlockNumberInt(data[2], data[3]);
 		if (blockNum != expectedBlockNum) {
 			// TODO: handle this error - not sure which type of error this qualifies as 
+			// SORCERER APPRENTICE!
 		}
 		
 		// check that there is no "extra" data beyond this packet's set length		
@@ -148,7 +149,8 @@ public class PacketParser {
 		// check that the block number is what we expect
 		int blockNum = PacketUtil.getBlockNumberInt(data[2], data[3]);
 		if (blockNum != expectedBlockNum) {
-			// TODO: handle this error - not sure which type of error this qualifies as 
+			// TODO: handle this error - not sure which type of error this qualifies as
+			// SORCERER APPRENTICE!
 		}
 		
 		if (packet.getLength() > 4)

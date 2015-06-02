@@ -8,6 +8,7 @@
 
 package tftp.server.thread;
 
+import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -46,6 +47,7 @@ public abstract class WorkerThread extends Thread {
 	 * Port number of the client process.
 	 */
 	protected int clientPort;
+	protected int defaultTimeout;
 	
 	protected PacketParser packetParser;
 	
@@ -61,9 +63,12 @@ public abstract class WorkerThread extends Thread {
 		this.reqPacket = reqPacket;
 		clientIP = reqPacket.getAddress();
 		clientPort = reqPacket.getPort();
+		setDefaultTimeout(5000);
 		
 		try {
 			sendReceiveSocket = new DatagramSocket();
+			sendReceiveSocket.setSoTimeout(getDefaultTimeout());
+			
 		} catch (SocketException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -85,10 +90,16 @@ public abstract class WorkerThread extends Thread {
 	protected void printToConsole(String message) {
 		System.out.printf("%s: %s\n", this.getName(), message);
 	}
-	
+		
 	/**
 	 * Overrides Thread's run method (to be implemented by subclasses).
 	 */	
+	
+	//get functions
+	protected int getDefaultTimeout(){return defaultTimeout;}
+	
+	//set functions
+	protected void setDefaultTimeout(int aDefaultTimeout){defaultTimeout = aDefaultTimeout;}
 	@Override
 	public abstract void run();
 	

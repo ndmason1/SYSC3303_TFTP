@@ -23,6 +23,8 @@ import tftp.exception.TFTPException;
 import tftp.server.thread.WorkerThread;
 
 public class Sender {
+	
+	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
 
 	private FileInputStream fileReader;
 	private DatagramSocket socket;
@@ -98,18 +100,20 @@ public class Sender {
 
 			// expect an ACK from the other side
 			printToConsole(String.format("waiting for ACK %d", blockNum));
-	        boolean PacketReceived = false;
+	        
+			boolean PacketReceived = false;
 	        int retransmission = 0;
-	        while (!PacketReceived && retransmission < 2){
+	        
+	        while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
 	        	try {
 	        		socket.receive(reply);
 	        		PacketReceived = true;
 	        	} catch (SocketTimeoutException ex){
-	        		//no response for last Data packet, Data packet may lost, resending...
-	        		printToConsole("Wait ack packet timeout, last data packet may lost, resending...");
+	        		//no response for last Data packet, Data packet maybe lost, resending...
+	        		printToConsole("Error: Timed out retreiving ACK Packet, Possible data packet loss, resending...");
 	    			try {
 	    				socket.send(sendPacket);
-	    				retransmission ++;
+	    				retransmission++;
 	    			} catch (IOException e) {
 	    				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 	    			}
@@ -118,7 +122,9 @@ public class Sender {
 	        	}     
 	        }
 	        
-	        if (retransmission == 2){
+	        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+	        	
+	        	//TO:DO Throw proper error using error codes?
 	        	System.out.println("Can not complete sending Request, teminated");
 	        	return;
 	        }
@@ -172,6 +178,7 @@ public class Sender {
 
 			// verify ack
 			int ackNum = packetUtil.parseAckPacket(reply);
+			
 			if (ackNum != blockNum) {
 				// TODO: handle out of sequence block
 			}

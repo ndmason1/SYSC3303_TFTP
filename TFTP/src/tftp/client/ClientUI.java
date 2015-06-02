@@ -8,6 +8,7 @@
 
 package tftp.client;
 
+import java.io.IOException;
 import java.util.Scanner;
 
 import tftp.exception.ErrorReceivedException;
@@ -29,7 +30,7 @@ public class ClientUI {
 		boolean check = true;
 		
 		while (check){
-			System.out.println("Error Simulator on? yes/no?");
+			System.out.println("Error Simulator on? y/n?");
 			String errorSimulator = keyboard.nextLine();
 		
 			if (errorSimulator.toLowerCase().equals("yes") || errorSimulator.toLowerCase().equals("y"))
@@ -41,6 +42,33 @@ public class ClientUI {
 			{
 				client.setPortNum(69);
 				check = false;
+			}
+		}
+		
+		check = true; 
+		
+		while (check){
+			System.out.println("Do you wish to use the default client directory path? y/n?");
+			String diskFullPath = keyboard.nextLine();
+		
+			if (diskFullPath.toLowerCase().equals("yes") || diskFullPath.toLowerCase().equals("y"))
+			{
+				try {
+					client.setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\client\\ClientFiles")));
+				} catch (IOException e) {			
+					System.out.println("Couldn't set up directory for client files! terminating");
+					e.printStackTrace();
+					cleanup();
+					System.exit(1);
+				}
+				check = false;
+			}
+			if (diskFullPath.toLowerCase().equals("no") || diskFullPath.toLowerCase().equals("n"))
+			{
+				System.out.println("Please enter in a valid target directory path: ");
+				diskFullPath = keyboard.nextLine();
+				//TODO check valid directory path
+				client.setDirectory(diskFullPath);
 			}
 		}
 		

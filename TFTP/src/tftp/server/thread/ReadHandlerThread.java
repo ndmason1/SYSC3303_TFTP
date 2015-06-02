@@ -14,7 +14,6 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.nio.file.Paths;
 
-import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
 import tftp.net.PacketUtil;
 import tftp.net.Sender;
@@ -45,7 +44,6 @@ public class ReadHandlerThread extends WorkerThread {
 		
 		printToConsole("processing request");
 		
-		byte[] data = reqPacket.getData();
 		PacketUtil packetUtil = new PacketUtil(reqPacket.getAddress(), reqPacket.getPort());
 		String filename = null;
 		
@@ -109,7 +107,7 @@ public class ReadHandlerThread extends WorkerThread {
 
 			try {			   
 				sendReceiveSocket.send(error);			   
-			} catch (IOException ex) {
+			}  catch (IOException ex) {
 				printToConsole("IOException occured while attemping to send ERROR packet");
 				ex.printStackTrace();
 				cleanup();

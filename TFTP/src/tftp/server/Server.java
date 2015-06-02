@@ -27,7 +27,7 @@ import tftp.server.thread.WorkerThreadFactory;
  *
  */
 public class Server {
-	
+		
 	//private variables
 	private DatagramPacket receivePacket;
 	private DatagramSocket receiveSocket;
@@ -36,7 +36,7 @@ public class Server {
 	private HashSet<WorkerThread> activatedThreads;
 	private boolean acceptNewConnections;
 	private int threadCount;
-	private String directory;	
+	private String directory;
 	
 	public Server()
 	{
@@ -69,7 +69,7 @@ public class Server {
 			// wait for request to come  in
 			try {
 				receiveSocket.receive(receivePacket);
-				
+		
 			} catch (IOException e) {
 				e.printStackTrace();
 				System.exit(1);
@@ -106,4 +106,5 @@ public class Server {
 	
 	//Server set functions
 	public void setDirectory(String aDirectory){directory = aDirectory;}
+	
 }

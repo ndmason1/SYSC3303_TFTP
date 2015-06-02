@@ -584,7 +584,6 @@ public class ErrorSimulator {
 
 	private void simulateIllegalOperation() {
 
-
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
 		receivePacket = new DatagramPacket(data, data.length);			
 		receivePacket.getLength();
