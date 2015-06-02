@@ -21,6 +21,8 @@ import java.net.UnknownHostException;
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
 import tftp.server.thread.WorkerThread;
+import tftp.sim.ErrorSimUtil;
+import tftp.sim.PacketType;
 
 public class Receiver
 {    
@@ -56,12 +58,14 @@ public class Receiver
 
 	public void receiveFile(DatagramPacket initPacket, File aFile) throws TFTPException {
 		
-		int blockNum = 1;
+		int expectedBlockNum = 1;		
+		int recvdBlockNum = -1;
 		
 		// parse the first DATA packet and see if we even need to continue
 		try {
-			printToConsole("RECEIVER: about to parse DATA packet with block number " + blockNum);
-			packetParser.parseDataPacket(initPacket, blockNum);
+			printToConsole("RECEIVER: about to parse DATA packet, expected block number " + expectedBlockNum);
+			packetParser.parseDataPacket(initPacket, expectedBlockNum);
+			recvdBlockNum = ErrorSimUtil.getBlockNumber(initPacket);
 
 		} catch (ErrorReceivedException e) {
 			// the other side sent an error packet, so in most cases don't send a response
@@ -136,14 +140,9 @@ public class Receiver
 			} catch (IOException e) {
 				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}
-
-			// create recv packet
-			data = new byte[PacketUtil.BUF_SIZE];
-			DatagramPacket receivePacket = new DatagramPacket(data, data.length);
-
-
+			
 			// send ACK for initial data packet
-			DatagramPacket sendPacket = packetUtil.formAckPacket(blockNum);
+			DatagramPacket sendPacket = packetUtil.formAckPacket(recvdBlockNum);
 
 			try {
 				socket.send(sendPacket);
@@ -155,6 +154,9 @@ public class Receiver
 			boolean done = initPacket.getLength() < 516;		
 
 			while (!done) {
+				data = new byte[PacketUtil.BUF_SIZE];
+				DatagramPacket receivePacket = new DatagramPacket(data, data.length);
+				
 				boolean PacketReceived = false;
 				int retransmission = 0;
 				while (!PacketReceived && retransmission < 2){
@@ -179,20 +181,27 @@ public class Receiver
 					}
 				}
 		        if (retransmission == 2){
-		        	System.out.println("Can not complete tranfer file, teminated");
+		        	System.out.println("retransmitted twice with no response");
+		        	System.out.println("Can not complete transfer file, aborting operation");
 		        	return;
 		        }
 		        
-				printToConsole(String.format("DATA %d received", blockNum));
+		        if (ErrorSimUtil.getPacketType(receivePacket) == PacketType.DATA) { 
+		        	printToConsole(String.format("DATA %d received (length %d)", ErrorSimUtil.getBlockNumber(receivePacket),
+						receivePacket.getLength()));
+		        } else if (ErrorSimUtil.getPacketType(receivePacket) == PacketType.ERROR) {
+		        	printToConsole(String.format("ERROR %d received", ErrorSimUtil.getErrorCode(receivePacket)));
+		        }
 				
 				
 				// increment block number so we can check if received packet has expected block number
-				blockNum++;
+				expectedBlockNum++;
 				
 				// parse the response packet to ensure it is correct before continuing
 				try {
-					printToConsole("RECEIVER: about to parse DATA packet with block number " + blockNum);
-					packetParser.parseDataPacket(receivePacket, blockNum);
+					printToConsole("RECEIVER: about to parse DATA packet, expected block number " + expectedBlockNum);
+					packetParser.parseDataPacket(receivePacket, expectedBlockNum);
+					recvdBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
 
 				} catch (ErrorReceivedException e) {
 					// the other side sent an error packet, so in most cases don't send a response
@@ -210,10 +219,12 @@ public class Receiver
 							// TODO fix resource leak
 							throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 						}
-					}
+					} else {
 					
-					// rethrow so the owner of this Receiver knows whats up
-					throw e;
+						// rethrow so the owner of this Receiver knows whats up
+						// unless Unknown TID, in which case we continue receiving
+						throw e;
+					}
 					
 				} catch (TFTPException e) {
 
@@ -235,8 +246,10 @@ public class Receiver
 						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 					}
 					
-					// rethrow so the owner of this Receiver knows whats up
-					throw e;
+					// rethrow so the owner of this Receiver knows whats up 
+					// unless Unknown TID, in which case we continue receiving
+					if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID)
+						throw e;
 				}
 				
 				//Check if the disk is already full, If full generate Error code-3
@@ -274,9 +287,8 @@ public class Receiver
 				}
 
 				// send ACK
-				blockNum = packetUtil.parseDataPacket(receivePacket);
-				sendPacket = packetUtil.formAckPacket(blockNum);
-				printToConsole(String.format("sending ACK %d", blockNum));		
+				sendPacket = packetUtil.formAckPacket(recvdBlockNum);
+				printToConsole(String.format("sending ACK %d", recvdBlockNum));		
 				
 
 				try {

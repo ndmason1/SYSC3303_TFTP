@@ -366,8 +366,7 @@ public class Client {
 		}
         
         if (retransmission == 2){
-        	System.out.println("Can not complete sending Request, teminated");
-        	cleanup();
+        	System.out.println("Can not complete sending Request");
         	return;
         }
         

@@ -127,8 +127,10 @@ public class ReadHandlerThread extends WorkerThread {
 			s.sendFile(f);
 		} catch (TFTPException e) {
 			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
-			cleanup();
-			return;
+			if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID) {
+				cleanup();
+				return;
+			}
 		}
 		
 		cleanup();

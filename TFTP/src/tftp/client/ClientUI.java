@@ -12,6 +12,7 @@ import java.util.Scanner;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
+import tftp.net.PacketUtil;
 import tftp.server.Server;
 import tftp.sim.ErrorSimulator;
 
@@ -120,9 +121,11 @@ public class ClientUI {
 				System.out.println("Could not complete request, please try again.");
 				return;		
 			} catch (TFTPException e) {
-				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
-				System.out.println("Could not complete request, please try again.");
-				return;
+				if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID) {
+					System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
+					System.out.println("Could not complete request, please try again.");
+					return;
+				}
 			}
 			System.out.println("Read of file " + client.getFilename() + " into directory " + client.getDirectory() + " finished.\n");
 			
@@ -136,7 +139,7 @@ public class ClientUI {
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				System.out.println("Could not complete request, please try again.");
 				return;			
-			} catch (TFTPException e) {
+			} catch (TFTPException e) {				
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				System.out.println("Could not complete request, please try again.");
 				return;
@@ -145,9 +148,11 @@ public class ClientUI {
 			try{
 			    client.sendWriteRequest();
 			}catch (TFTPException e){
-				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
-				System.out.println("Could not complete request, please try again.");
-				return;
+				if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID) {
+					System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
+					System.out.println("Could not complete request, please try again.");
+					return;
+				}
 			}
 			
 			System.out.println("Write of file " + client.getFilename() + " from directory " + client.getDirectory() + " finished.\n");

@@ -6,6 +6,7 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.util.LinkedList;
 import java.util.Scanner;
@@ -22,6 +23,8 @@ import tftp.server.Server;
  *  Note that the Client must be run in the correct mode to communicate with the ErrorSimulator.
  */
 public class ErrorSimulator {
+	
+	public static final int TIMEOUT_MS = 2000; // temporary constant to use to detect timeout
 	
 	public static final int LISTEN_PORT = 78; // not using 68 due to its usage by windows DHCP service	
 
@@ -248,7 +251,7 @@ public class ErrorSimulator {
 		}
 		
 		// determine if block number must be entered
-		boolean getBlockNumber = (packetTypeSelection == PacketType.DATA || 
+		boolean getNumber = (packetTypeSelection == PacketType.DATA || 
 								packetTypeSelection == PacketType.ACK);
 				
 		switch (simTypeSelection) {
@@ -257,21 +260,21 @@ public class ErrorSimulator {
 			break;
 			
 		case PACKET_DELAY:
-			if (getBlockNumber)
+			if (getNumber)
 				showBlockNumberPrompt(packetTypeSelection.name() + " selected as packet to delay.");
 			else 
 				simulateDelayedPacket();
 			break;
 			
 		case PACKET_DUPLICATE:
-			if (getBlockNumber)
+			if (getNumber)
 				showBlockNumberPrompt(packetTypeSelection.name() + " selected as packet to delay.");
 			else 
 				//simulateDuplicateddPacket();
 			break;
 			
 		case PACKET_LOST:
-			if (getBlockNumber)
+			if (getNumber)
 				showBlockNumberPrompt(packetTypeSelection.name() + " selected as packet to delay.");
 			else 
 				//simulateLostPacket();
@@ -421,8 +424,7 @@ public class ErrorSimulator {
 		System.out.println("Packets received from client will be forwarded to server, and vice versa.\n");
 
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
-		receivePacket = new DatagramPacket(data, data.length);			
-		receivePacket.getLength();
+		receivePacket = new DatagramPacket(data, data.length);		
 
 		// listen for a client packet
 		receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "RRQ/WRQ");
@@ -648,7 +650,7 @@ public class ErrorSimulator {
 			} else {				
 				
 				// received RRQ, now it must be modified to trigger illegal operation
-				sendPacket = getCorruptedPacket(receivePacket, illegalOpTypeSelection);
+				sendPacket = ErrorSimUtil.getCorruptedPacket(receivePacket, illegalOpTypeSelection);
 				sendPacket.setAddress(serverIP);
 				sendPacket.setPort(Server.SERVER_PORT);
 				
@@ -689,7 +691,7 @@ public class ErrorSimulator {
 				return;
 			} else {
 				// received WRQ, now it must be modified to trigger illegal operation
-				sendPacket = getCorruptedPacket(receivePacket, illegalOpTypeSelection);
+				sendPacket = ErrorSimUtil.getCorruptedPacket(receivePacket, illegalOpTypeSelection);
 				sendPacket.setAddress(serverIP);
 				sendPacket.setPort(Server.SERVER_PORT);
 				
@@ -800,7 +802,7 @@ public class ErrorSimulator {
 		if (receiverProcessSelection == ProcessType.CLIENT) {
 			if (packetTypeSelection == PacketType.DATA || packetTypeSelection == PacketType.ACK ) {
 				
-				sendPacket = getCorruptedPacket(receivePacket, illegalOpTypeSelection);
+				sendPacket = ErrorSimUtil.getCorruptedPacket(receivePacket, illegalOpTypeSelection);
 				sendPacket.setAddress(clientIP);
 				sendPacket.setPort(clientPort);
 
@@ -838,7 +840,7 @@ public class ErrorSimulator {
 				DatagramPacket errPacket = packetUtil.formErrorPacket(PacketUtil.ERR_ACCESS_VIOLATION, 
 						"user does not have permission to access that file");
 				
-				sendPacket = getCorruptedPacket(errPacket, illegalOpTypeSelection);
+				sendPacket = ErrorSimUtil.getCorruptedPacket(errPacket, illegalOpTypeSelection);
 
 				// send modified ERROR packet
 				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "modified ERROR (2)");			
@@ -881,7 +883,7 @@ public class ErrorSimulator {
 		// simulate based on selected packet type
 		if (packetTypeSelection == PacketType.DATA || packetTypeSelection == PacketType.ACK ) {
 			
-			sendPacket = getCorruptedPacket(receivePacket, illegalOpTypeSelection);
+			sendPacket = ErrorSimUtil.getCorruptedPacket(receivePacket, illegalOpTypeSelection);
 			sendPacket.setAddress(serverIP);
 			sendPacket.setPort(serverTID);
 
@@ -921,7 +923,7 @@ public class ErrorSimulator {
 			DatagramPacket errPacket = packetUtil.formErrorPacket(PacketUtil.ERR_ACCESS_VIOLATION, 
 					"user does not have permission to access that file");
 			
-			sendPacket = getCorruptedPacket(errPacket, illegalOpTypeSelection);
+			sendPacket = ErrorSimUtil.getCorruptedPacket(errPacket, illegalOpTypeSelection);
 
 			// send modified ERROR packet
 			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "modified ERROR (2)");			
@@ -961,8 +963,7 @@ public class ErrorSimulator {
 	 */
 	private void simulateDelayedPacket() {
 		
-		// prompt for time in ms to delay		
-		
+		// prompt for time in ms to delay
 		System.out.println("Please enter the amount of time (in ms) to delay the packet: \n");
 		
 		String input = null;
@@ -977,7 +978,11 @@ public class ErrorSimulator {
 
 		int delayInMs = Integer.parseInt(input);
 		
-		System.out.println("==== EXECUTING SIMULATION ====");
+		// get number of retransmits expected from the process who sends delayed packet
+		int expectedRetransmits = (int) Math.min( Math.floor(delayInMs / TIMEOUT_MS), 2.0 );
+		
+		System.out.printf("Delay selected: %dms. (%d retransmission(s) expected)\n\n", delayInMs, expectedRetransmits);		
+		System.out.println("==== EXECUTING SIMULATION ====\n");
 
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
 		receivePacket = new DatagramPacket(data, data.length);			
@@ -1017,10 +1022,12 @@ public class ErrorSimulator {
 				System.out.println("Wrong packet type received from client! (expected RRQ)");
 				System.out.println("terminating simulation");
 				return;
+				
 			} else {				
 
 				// received RRQ, now it must be delayed
 
+				System.out.printf("Waiting %dms before sending next packet...\n", delayInMs);
 				try {
 					Thread.sleep(delayInMs);
 				} catch (InterruptedException e) {
@@ -1038,47 +1045,104 @@ public class ErrorSimulator {
 				
 				// receive response
 				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA");
-				int serverTIDA = receivePacket.getPort();
+				int serverTID = receivePacket.getPort();
+				System.out.printf("server TID for request is %d\n", serverTID);
+								
+				// send response to client
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+				sendPacket.setAddress(clientIP);
+				sendPacket.setPort(clientPort);
+				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
 				
-				// listen for client retransmit 
-				// NOTE THAT THIS IS ONLY CORRECT TO DO IF THE GIVEN DELAY IS GREATER THAN THE TIMEOUT THRESHOLD
-				// (could use a constant for timeout time used by the client here...)
-				receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "retransmitted RRQ");
+				// for each retransmit expected...
+				for (int i = 0; i < expectedRetransmits; i++) {
+					System.out.printf("\n\t retransmission %d\n", i+1);
+					// listen for client retransmit
+					receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, String.format("RRQ (retransmit %d)", i+1));
+					
+					// forward to server
+					sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+					sendPacket.setAddress(serverIP);
+					sendPacket.setPort(Server.SERVER_PORT);
+					sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, String.format("RRQ (retransmit %d)", i+1));
+					
+					// receive response
+					receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA");
+					int otherServerTID = receivePacket.getPort();
+					System.out.printf("server TID for retransmitted (%d) request is %d\n", i+1, otherServerTID);
+					
+					// create a new socket to simulate new server TID
+					DatagramSocket secondClientSendRecvSocket = null;
+					try {
+						secondClientSendRecvSocket = new DatagramSocket();
+					} catch (SocketException e1) {
+						e1.printStackTrace();
+					}		
+					
+					// send second response to client
+					sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+					sendPacket.setAddress(clientIP);
+					sendPacket.setPort(clientPort);
+					sendPacketToProcess(secondClientSendRecvSocket, ProcessType.CLIENT, "DATA");
+					
+					// listen for client ERROR
+					receivePacketFromProcess(secondClientSendRecvSocket, ProcessType.CLIENT, "ERROR (5)");
+					
+					// check if client sent unknown TID error
+					printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_UNKNOWN_TID);
+					
+					// send error 5 to server (new packet in case the client didn't actually send ERROR 5)
+					PacketUtil packetUtil = new PacketUtil(serverIP, otherServerTID);
+					sendPacket = packetUtil.formErrorPacket(PacketUtil.ERR_UNKNOWN_TID, 
+							"received packet from unrecognized source port");	
+					
+					sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "ERROR");
+					
+				}
 				
-				// send the retransmitted request to server after the delay
+				
+				System.out.println("\n\tFinishing file transfer...");
+				// get response from original client sendRecv socket
+				receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "ACK");				
+				
+				// forward to server
 				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
 				sendPacket.setAddress(serverIP);
-				sendPacket.setPort(Server.SERVER_PORT);
-				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "retransmitted RRQ");
-
-				// receive retransmitted response from a different server port
-				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "retransmitted DATA");
-				int serverTIDB = receivePacket.getPort();
-				
-				// send first response to client
-				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-				sendPacket.setAddress(clientIP);
-				sendPacket.setPort(clientPort);
-				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "original DATA");
-
-				// create a new socket to simulate new server TID
-				DatagramSocket secondClientSendRecvSocket = null;
-				try {
-					secondClientSendRecvSocket = new DatagramSocket();
-				} catch (SocketException e1) {
-					// TODO Auto-generated catch block
-					e1.printStackTrace();
-				}		
-				
-				// send second response to client
-				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-				sendPacket.setAddress(clientIP);
-				sendPacket.setPort(clientPort);
-				sendPacketToProcess(secondClientSendRecvSocket, ProcessType.CLIENT, "retransmitted DATA");
+				sendPacket.setPort(serverTID);
+				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
 
 				// finish the transfer so client goes back to ready state
-				finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
-						ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTIDA);
+				finishTransfer(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID,
+						ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort);
+				
+				// set timeout on client receive socket  
+				try {
+					clientRecvSocket.setSoTimeout(2*TIMEOUT_MS);
+				} catch (SocketException e) {
+					e.printStackTrace();
+				}
+				
+				// listen to detect extra retransmits
+				System.out.println("Listening for further retransmissions from client...");
+				boolean timedOut = false;
+				try {				
+					receivePacketOrTimeout(clientRecvSocket, ProcessType.CLIENT, "retransmitted");
+				} catch (SocketTimeoutException e) {
+					timedOut = true;
+				}
+				
+				if (!timedOut) {
+					System.out.println("\nIncorrectly received an extra retransmission from client! [FAIL]");
+				} else {
+					System.out.println("\nSocket timed out, no further retransmission received [PASS]");
+				}
+				
+				// reset timeout to 0  
+				try {
+					clientRecvSocket.setSoTimeout(0);
+				} catch (SocketException e) {
+					e.printStackTrace();
+				}
 
 				// end simulation
 				printEndSimulation();
@@ -1150,10 +1214,21 @@ public class ErrorSimulator {
 				sendPacket.setPort(clientPort);
 				sendPacketToProcess(secondClientSendRecvSocket, ProcessType.CLIENT, "retransmitted ACK");
 
-				// finish the transfer so client goes back to ready state
+				// listen for first client DATA
+				receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "retransmitted WRQ");
+				
+				// listen for unknown TID error
+				receivePacketFromProcess(secondClientSendRecvSocket, ProcessType.CLIENT, "ERROR (5)");
+				
+				// check if client sent unknown TID error
+				printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_UNKNOWN_TID);
+				
+				// send DATA to server and finish the transfer so client goes back to ready state
+				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA");
 				finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
 						ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTIDA);
 
+				
 				// end simulation
 				printEndSimulation();
 				return;
@@ -1164,17 +1239,19 @@ public class ErrorSimulator {
 			// check that the parameters make sense e.g. server cant recv delayed ACK if started with WRQ
 
 			boolean exitSimulation = false;
+			PacketType expectedRequestType = null;
 
 			if (receiverProcessSelection == ProcessType.SERVER) {
 
 				if (startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.ACK) {
 
-					System.out.println("Wrong packet type received from client! (expected RRQ)");
+					
+					expectedRequestType = PacketType.RRQ;
 					exitSimulation = true;
 
 				} else if (startingRequestType == PacketType.RRQ && packetTypeSelection == PacketType.DATA) {
 
-					System.out.println("Wrong packet type received from client! (expected WRQ)");
+					expectedRequestType = PacketType.WRQ;
 					exitSimulation = true;
 				}
 
@@ -1182,18 +1259,19 @@ public class ErrorSimulator {
 
 				if (startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.DATA) {
 
-					System.out.println("Wrong packet type received from client! (expected RRQ)");
+					expectedRequestType = PacketType.RRQ;
 					exitSimulation = true;
 
 				} else if (startingRequestType == PacketType.RRQ && packetTypeSelection == PacketType.ACK) {
 
-					System.out.println("Wrong packet type received from client! (expected WRQ)");
+					expectedRequestType = PacketType.WRQ;
 					exitSimulation = true;
 				}
 
 			}
 
 			if (exitSimulation) {
+				System.out.printf("Wrong packet type received from client! (expected %s)\n", expectedRequestType.name());
 				System.out.println("cannot proceed, finishing simulation...");
 
 				// send request to server
@@ -1222,121 +1300,8 @@ public class ErrorSimulator {
 		
 		
 	}
-
-	/**
-	 * Utility function to return a packet that has been modified to trigger an
-	 * illegal operation error.
-	 * 
-	 *  @param originalPacket	the packet to be modified
-	 *  @param illegalOpType	the method of modification
-	 *  @return 				a modified DatagramPacket
-	 */
-	private static DatagramPacket getCorruptedPacket(DatagramPacket originalPacket, IllegalOperationType illegalOpType) {
-
-		byte[] newData = originalPacket.getData();
-		int newLength = originalPacket.getLength();
-
-		switch (illegalOpType) {
-		case OPCODE: // invalidate the opcode field
-			newData[0] = 0xf; // set the very first byte to non-zero
-			break;
-
-		case FILENAME: // invalidate the filename field (only for RRQ/WRQ)
-			// TODO: find a better way to invalidate text fields?
-			newData[2] = 0x1; // set the first filename byte to non-printable character
-			break;
-
-		case MODE: // invalidate the mode field (only for RRQ/WRQ)
-			// TODO: find a better way to invalidate text fields?
-			int index = getFilenameLength(newData) + 3; // get the index of the first mode character
-			newData[index] = 0x1; // set the first mode byte to non-printable character
-			break;
-
-		case BLOCKNUM: // invalidate the block number field (only for DATA/ACK)
-			// "invalid" block number depends on what the current block number is
-			// for now, just set it to zero - this is valid only for the first ACK in a WRQ
-			newData[2] = 0x0;
-			newData[3] = 0x0;
-			break;
-
-		case ERRCODE: // invalidate the error code field (only for ERROR)
-			newData[2] = 0xf; // set the first error code byte to non-zero 
-			break;
-
-		case ERRMSG: // invalidate the error message field (only for ERROR)
-			// TODO: find a better way to invalidate text fields?
-			newData[4] = 0x1; // set the first message byte to non-printable character
-			break;
-		
-		case LENGTH_TOO_SHORT:
-			newLength -= 2; // shorten the length by 2 bytes
-			break;
-		default:
-			break;			
-		}
-
-		DatagramPacket newPacket = new DatagramPacket(newData, newLength);
-		return newPacket;
-
-	}
-
-	/**
-	 * Utility function to return the length of a filename contained in a RRQ or WRQ packet.
-	 * 
-	 *  @param data		the contents of a request packet
-	 *  @return 		the length of the string
-	 */
-	private static int getFilenameLength (byte[] data) {
-
-		int length = 0;
-		for (int i = 2; i < data.length; i++) {
-			if (data[i] == 0) {
-				length = i - 2;
-				break;
-			}
-		}
-
-		return length;
-	}
 	
-	/**
-	 * Utility function to return the error message contained in an ERROR packet.
-	 * 
-	 *  @param data		the contents of an ERROR packet
-	 *  @return 		the error message
-	 */
-	private static String getErrMessage(byte[] data) {
-
-		StringBuilder sb = new StringBuilder();
-		
-		for (int i = 4; i < data.length; i++) {
-			sb.append((char)data[i]);
-			if (data[i] == 0)				
-				break;
-		}
-
-		return sb.toString();
-	}
-
-	/**
-	 * Utility function to display the opcode of a TFTP packet.
-	 * 
-	 *  @param packet	the packet
-	 */
-	private void printOpcode(DatagramPacket packet) {
-		byte[] data = packet.getData();
-		System.out.printf("[opcode: %02x]\n", data[1]);
-	}
 	
-	/**
-	 * Utility function to check if a packet is an ERROR packet.
-	 * 
-	 *  @param packet	the packet
-	 *  @return			true if ERROR packet
-	 */
-	private boolean isErrorPacket(DatagramPacket packet) {
-		return packet.getData()[1] == PacketUtil.ERROR_FLAG;
-	}
 
 	/**
 	 * Terminate the ErrorSimulator's execution. 
@@ -1363,12 +1328,13 @@ public class ErrorSimulator {
 	 *  @param recvSocket			the DatagramSocket to listen on
 	 *  @param sendProcess			the process (client or server) expected to send a packet
 	 *  @param expectedPacketStr	a string describing the expected type of packet to receive, which is displayed
+	 *  @throws SocketTimeoutException 	if a timeout was set and has expired
 	 */
 	private void receivePacketFromProcess(DatagramSocket recvSocket, ProcessType sendProcess, String expectedPacketStr) {
 		
 		// listen for a packet from given source process
 		// note this function doesn't actually enforce the packet type received, since it might not always matter
-		System.out.printf("listening on UDP port %s for %s packet from %s ... ", recvSocket.getLocalPort(), 
+		System.out.printf("listening on port %s for %s packet from %s ... ", recvSocket.getLocalPort(), 
 				expectedPacketStr, sendProcess);
 		try {
 			recvSocket.receive(receivePacket);
@@ -1377,37 +1343,92 @@ public class ErrorSimulator {
 			System.out.println("cannot proceed, terminating simulation");
 			System.exit(1);
 		}	
-		receivedPacketType = getPacketType(receivePacket);
-		System.out.printf("received %s packet ", receivedPacketType.name());
-		printOpcode(receivePacket);
+		
+		receivedPacketType = ErrorSimUtil.getPacketType(receivePacket);		
+		String label = receivedPacketType.name();
+		
+		// if DATA or ACK packet, display block number		
+		if (receivedPacketType == PacketType.DATA || receivedPacketType == PacketType.ACK)
+			label += " " + ErrorSimUtil.getBlockNumber(receivePacket);
+		else if (receivedPacketType == PacketType.ERROR)
+			label += " " + ErrorSimUtil.getErrorCode(receivePacket);
+		
+		System.out.printf("received %s packet ", label);
+		ErrorSimUtil.printOpcode(receivePacket);
+	}
+	
+	/**
+	 * Listens for a packet from the given process and displays information.
+	 * The socket may timeout, in which case a SocketTimeoutException is thrown.
+	 * Sets receivedPacket and receivedPacketType to the packet that was 
+	 * received and its type, respectively.
+	 * 
+	 *  @param recvSocket			the DatagramSocket to listen on
+	 *  @param sendProcess			the process (client or server) expected to send a packet
+	 *  @param expectedPacketStr	a string describing the expected type of packet to receive, which is displayed
+	 *  @throws SocketTimeoutException 	if a timeout was set and has expired
+	 */
+	private void receivePacketOrTimeout(DatagramSocket recvSocket, ProcessType sendProcess, String expectedPacketStr) 
+			throws SocketTimeoutException {
+		
+		// listen for a packet from given source process
+		// note this function doesn't actually enforce the packet type received, since it might not always matter
+		System.out.printf("listening on port %s for %s packet from %s ... ", recvSocket.getLocalPort(), 
+				expectedPacketStr, sendProcess);
+		try {
+			recvSocket.receive(receivePacket);
+		} catch (SocketTimeoutException e) {
+			throw e;
+		} catch (IOException e) {
+			System.out.printf("IOException caught receiving %s packet: %s", sendProcess, e.getMessage());
+			System.out.println("cannot proceed, terminating simulation");
+			System.exit(1);
+		}	
+		
+		receivedPacketType = ErrorSimUtil.getPacketType(receivePacket);		
+		String label = receivedPacketType.name();
+		
+		// if DATA or ACK packet, display block number		
+		if (receivedPacketType == PacketType.DATA || receivedPacketType == PacketType.ACK)
+			label += " " + ErrorSimUtil.getBlockNumber(receivePacket);
+		else if (receivedPacketType == PacketType.ERROR)
+			label += " " + ErrorSimUtil.getErrorCode(receivePacket);
+		
+		System.out.printf("received %s packet ", label);
+		ErrorSimUtil.printOpcode(receivePacket);
 	}
 	
 	/**
 	 * Sends a packet to the given process and displays information.
-	 * 
-	 * 
-	 *  @param sendSocket		the DatagramSocket to listen on
+	 * 	 * 
+	 *  @param sendSocket		the DatagramSocket to use for sending
 	 *  @param recvProcess		the process (client or server) who should be listening for the packet
 	 *  @param sendPacketStr	a string describing the packet being sent, which is displayed
 	 */
 	private void sendPacketToProcess(DatagramSocket sendSocket, ProcessType recvProcess, String sendPacketStr) {		
 		
-		// sends a packet to a given destination process
-		System.out.printf("sending %s packet to %s (IP: %s, UDP port %d) ... ", 
-				sendPacketStr, recvProcess, sendPacket.getAddress(), sendPacket.getPort());
 		
-		PacketType sendPacketType = getPacketType(sendPacket);
+		System.out.printf("sending %s packet to %s (IP: %s, port %d) ... ", 
+				sendPacketStr, recvProcess, sendPacket.getAddress(), sendPacket.getPort());		
 		
 		try {
 			sendSocket.send(sendPacket);
 		} catch (IOException e) {
 			System.out.printf("IOException caught sending %s packet: %s", recvProcess, e.getMessage());
 			System.out.println("cannot proceed, terminating simulation");
-			System.exit(1);
+			return;
 		}	
 		
-		System.out.printf("sent %s packet ", sendPacketType.name());
-		printOpcode(sendPacket);
+		PacketType sendType = ErrorSimUtil.getPacketType(sendPacket);		
+		String label = sendType.name();
+		// if DATA or ACK packet, display block number		
+		if (sendType == PacketType.DATA || sendType == PacketType.ACK)
+			label += " " + ErrorSimUtil.getBlockNumber(sendPacket);
+		else if (sendType == PacketType.ERROR)
+			label += " " + ErrorSimUtil.getErrorCode(receivePacket);
+		
+		System.out.printf("sent %s packet ", label);
+		ErrorSimUtil.printOpcode(sendPacket);
 	}
 	
 	/**
@@ -1424,11 +1445,11 @@ public class ErrorSimulator {
 		if (receivedPacketType == PacketType.ERROR) {
 
 			if (receivePacket.getData()[3] == expectedErrCode) {
-				String msg = getErrMessage(receivePacket.getData());
+				String msg = ErrorSimUtil.getErrMessage(receivePacket.getData());
 				System.out.printf("%s responded with ERROR code %d as expected! [PASS]\n", srcProcName, expectedErrCode);
 				System.out.printf("error message from packet: \"%s\"\n", msg);
 			} else {
-				String msg = getErrMessage(receivePacket.getData());
+				String msg = ErrorSimUtil.getErrMessage(receivePacket.getData());
 				System.out.printf("%s responded with ERROR code %d (not %d as expected) [FAIL]\n", 
 						srcProcName, receivePacket.getData()[3], expectedErrCode);
 				System.out.printf("error message from packet: \"%s\"\n", msg);
@@ -1438,37 +1459,6 @@ public class ErrorSimulator {
 			System.out.printf("%s response was not an ERROR packet as expected [FAIL]\n", srcProcName); 
 		}
 	}
-	
-	/**
-	 * Get the type of a TFTP packet.   
-	 * 
-	 *  @param packet	the packet to inspect
-	 *  @return 		the type of the packet
-	 */
-	private PacketType getPacketType(DatagramPacket packet) {
-		
-		switch (packet.getData()[1]) {
-		case PacketUtil.READ_FLAG:
-			return PacketType.RRQ;
-			
-		case PacketUtil.WRITE_FLAG:
-			return PacketType.WRQ;
-			
-		case PacketUtil.DATA_FLAG:
-			return PacketType.DATA;
-			
-		case PacketUtil.ACK_FLAG:
-			return PacketType.ACK;
-			
-		case PacketUtil.ERROR_FLAG:
-			return PacketType.ERROR;
-			
-		default:
-			// we should only be parsing server or client packets so 
-			// only genuine network errors will cause this
-			return null; 
-		}
-	} 
 	
 	/**
 	 * Display message to indicate end of simulation and receives user input to reset the menu.
@@ -1570,7 +1560,7 @@ public class ErrorSimulator {
 	 */
 	private boolean isFinalDataPacket(DatagramPacket packet) {
 		// return false if not a DATA packet 
-		if (getPacketType(packet) != PacketType.DATA)
+		if (ErrorSimUtil.getPacketType(packet) != PacketType.DATA)
 			return false;
 		
 		// check length including opcode and block number
@@ -1585,7 +1575,7 @@ public class ErrorSimulator {
 	 */
 	private boolean isTerminatingErrorPacket(DatagramPacket packet) {
 		// return false if not an ERROR packet 
-		if (getPacketType(packet) != PacketType.ERROR)
+		if (ErrorSimUtil.getPacketType(packet) != PacketType.ERROR)
 			return false;
 		
 		byte errCode = packet.getData()[3];

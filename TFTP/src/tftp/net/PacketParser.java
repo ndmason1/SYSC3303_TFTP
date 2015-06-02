@@ -121,7 +121,7 @@ public class PacketParser {
 		// check that there is no "extra" data beyond this packet's set length		
 		for (int i = packet.getLength(); i < data.length; i++) {
 			if (data[i] != 0) 
-				throw new TFTPException("data found beyond packet length", PacketUtil.ERR_ILLEGAL_OP);
+				throw new TFTPException("data found beyond packet length at byte " + i, PacketUtil.ERR_ILLEGAL_OP);
 		}			
 	}
 	
