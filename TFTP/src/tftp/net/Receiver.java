@@ -143,7 +143,8 @@ public class Receiver
 					duplicatePacket = receivedBlockNum < blockNum;					
 					
 				} catch(SocketTimeoutException e){
-					//response data packet not received, last ack packet may lost, resending...
+					
+					printToConsole("Error: Response data packet not received, last ack packet may lost, resending...");
 					try {
 						if (retransmission == DEFAULT_RETRY_TRANSMISSION){
 							System.out.println("Can not complete tranfer file, terminated");
@@ -313,7 +314,7 @@ public class Receiver
 			} catch (IOException ex) {			   
 				throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}	
-
+				
 			throw new TFTPException(msg, PacketUtil.ERR_DISK_FULL);
 
 		}

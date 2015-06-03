@@ -96,7 +96,7 @@ public class Sender {
 
 			printToConsole(String.format("Sending DATA block %d with %d byte payload.", blockNum, bytesRead));
 			try {
-				socket.send(sendPacket); // if duplicate packet is false we ignore and don't send anything.
+				socket.send(sendPacket); 
 			} catch (IOException e) {
 				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}
