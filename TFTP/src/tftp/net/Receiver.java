@@ -141,7 +141,7 @@ public class Receiver
 					PacketReceived = true;
 					receivedBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
 					duplicatePacket = receivedBlockNum < blockNum;					
-					//
+					
 				} catch(SocketTimeoutException e){
 					//response data packet not received, last ack packet may lost, resending...
 					try {
@@ -149,8 +149,11 @@ public class Receiver
 							System.out.println("Can not complete tranfer file, terminated");
 							return;
 						}
-						if (!duplicatePacket) {socket.send(sendPacket);}
-						retransmission++;
+						if (!duplicatePacket) {
+							socket.send(sendPacket);
+							retransmission++;
+						}
+						
 					} catch (IOException ew) {
 						throw new TFTPException(ew.getMessage(), PacketUtil.ERR_UNDEFINED);
 					}
