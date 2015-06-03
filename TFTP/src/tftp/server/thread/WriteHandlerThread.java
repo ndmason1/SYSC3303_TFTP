@@ -23,6 +23,7 @@ import tftp.net.Receiver;
  */
 public class WriteHandlerThread extends WorkerThread {
 	
+	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
 	private String directory;	
 	
 	/**
@@ -131,15 +132,26 @@ public class WriteHandlerThread extends WorkerThread {
 		// get the first data packet so we can set up receiver
 		data = new byte[PacketUtil.BUF_SIZE];
 		receivePacket = new DatagramPacket(data, data.length);
-		try {
-			sendReceiveSocket.receive(receivePacket);
-		} catch (SocketTimeoutException socketTimeoutException) {
-			printToConsole("Error Socket Timeout occured retrieving DATA packet");
-			return;
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
 		
+		boolean PacketReceived = false;
+        int retransmission = 0;
+        
+        while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){ 
+        	try {
+		        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+		        	System.out.println("Can not complete sending Request, terminated");
+		        	return;
+		        }
+        		sendReceiveSocket.receive(receivePacket);
+        		PacketReceived = true;
+        		retransmission++;
+        	} catch (SocketTimeoutException socketTimeoutException) {
+        		printToConsole("Error Socket Timeout occured retrieving DATA packet");
+        		return;
+        	} catch (IOException e) {
+        		e.printStackTrace();
+        	}
+        }
 		// set up receiver with request packet's port, as this is the client's TID
 		Receiver r = new Receiver(this, sendReceiveSocket, reqPacket.getPort());
 		try {
