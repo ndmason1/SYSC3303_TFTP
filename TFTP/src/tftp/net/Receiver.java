@@ -103,8 +103,9 @@ public class Receiver
 			if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID)
 				throw e;
 		}
-
+		
 		createFile(aFile);
+		checkDiskFull(aFile, initPacket);
 		writeToFile(data, initPacket);
 		
 		// create recv packet

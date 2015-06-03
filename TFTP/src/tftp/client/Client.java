@@ -149,7 +149,7 @@ public class Client {
 
 		// create send packet
 		sendPacket = packetUtil.formRrqPacket(getFilename(), getMode());
-	
+	    
 		try {
 			sendReceiveSocket.send(sendPacket);	
 		} catch (IOException e) {
@@ -195,7 +195,7 @@ public class Client {
         }
         
 		PacketParser parser = new PacketParser(targetIP, receivePacket.getPort());
-
+		
 		try {
 			//receive first data packet with block #1
 			parser.parseDataPacket(receivePacket, 1);

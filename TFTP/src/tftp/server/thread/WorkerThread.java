@@ -53,6 +53,7 @@ public abstract class WorkerThread extends Thread {
 	
 	protected static int id = 1;
 	
+	protected String directory;
 	/**
 	 * Constructs a WorkerThread. 
 	 *
@@ -63,7 +64,7 @@ public abstract class WorkerThread extends Thread {
 		this.reqPacket = reqPacket;
 		clientIP = reqPacket.getAddress();
 		clientPort = reqPacket.getPort();
-		setDefaultTimeout(5000);
+		setDefaultTimeout(2000);
 		
 		try {
 			sendReceiveSocket = new DatagramSocket();
@@ -102,6 +103,8 @@ public abstract class WorkerThread extends Thread {
 	protected void setDefaultTimeout(int aDefaultTimeout){defaultTimeout = aDefaultTimeout;}
 	@Override
 	public abstract void run();
+	
+	public void setDirectory(String Directory){this.directory = Directory;}
 	
 
 }

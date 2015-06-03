@@ -33,6 +33,7 @@ public class WriteHandlerThread extends WorkerThread {
 	 */
 	public WriteHandlerThread(DatagramPacket reqPacket) {
 		super("WriteHandler-" + id++, reqPacket);
+		this.directory = super.directory;
 	}
 	
 	/**
@@ -87,14 +88,9 @@ public class WriteHandlerThread extends WorkerThread {
 			return;
 		}	
 		
-		try {
-			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\server\\ServerFiles")));
-		} catch (IOException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
 	
 		File f = new File(getDirectory().concat("\\" + filename));
+		System.out.println(getDirectory().concat("\\" + filename));
 		
 		if(f.exists() && !f.canWrite()){    // no write access
 

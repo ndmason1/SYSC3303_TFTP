@@ -9,7 +9,7 @@
 
 package tftp.server;
 
-
+import java.util.Scanner;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
@@ -48,6 +48,36 @@ public class Server {
 			se.printStackTrace();
 			System.exit(1);
 		}
+		boolean check = true; 
+		Scanner sd = new Scanner(System.in);
+		while (check){
+			System.out.println("Do you wish to use the default server directory path? y/n?");
+			String diskFullPath = sd.nextLine();
+		
+			if (diskFullPath.toLowerCase().equals("yes") || diskFullPath.toLowerCase().equals("y"))
+			{
+				try {
+					setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\server\\ServerFiles")));
+					System.out.println("Using default server directory!");
+				} catch (IOException e) {			
+					System.out.println("Couldn't set up directory for client files! terminating");
+					e.printStackTrace();
+					cleanup();
+					System.exit(1);
+				}
+				check = false;
+			}
+			if (diskFullPath.toLowerCase().equals("no") || diskFullPath.toLowerCase().equals("n"))
+			{
+				System.out.println("Please enter in a valid target directory path: ");
+				diskFullPath = sd.nextLine();
+				//TODO check valid directory path
+				setDirectory(diskFullPath);
+				check = false;
+				System.out.println("Successfully changed server directory!");
+			}
+		}
+	
 		
 		threadFactory = new WorkerThreadFactory();	
 		threadFactory = new WorkerThreadFactory();
@@ -86,8 +116,10 @@ public class Server {
 			// spawn a thread to process request
 			WorkerThread worker = null;
 			try {
-				worker = threadFactory.createWorkerThread(receivePacket);				
-				worker.start();
+				
+				worker = threadFactory.createWorkerThread(receivePacket);	
+				worker.setDirectory(directory);
+				worker.start();	
 			} catch (TFTPException e) {
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());				
 			}

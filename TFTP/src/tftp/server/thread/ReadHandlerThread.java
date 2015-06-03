@@ -33,6 +33,7 @@ public class ReadHandlerThread extends WorkerThread {
 	
 	public ReadHandlerThread(DatagramPacket reqPacket) {
 		super("ReadHandler-" + id++, reqPacket);
+		this.directory = super.directory;
 	}	
 
 	/**
@@ -65,19 +66,14 @@ public class ReadHandlerThread extends WorkerThread {
 			return;
 		}
 		
-		try {
-			setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\server\\ServerFiles")));
-		} catch (IOException e1) {			
-			e1.printStackTrace();
-			cleanup();
-			return;
-		}
+
 	
 		//\\//\\//\\ File Not Found - Error Code 1 //\\//\\//\\
 
 		//Opens an input stream
 		File f = new File(getDirectory().concat("\\" + filename));
 		Path path = Paths.get(getDirectory().concat("\\" + filename));
+		System.out.println(getDirectory().concat("\\" + filename));
 		if(!f.exists()){    //file doesn't exist
 
 			byte errorCode = PacketUtil.ERR_FILE_NOT_FOUND;   //error code 1 : file not found

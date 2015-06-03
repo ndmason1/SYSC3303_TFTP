@@ -72,6 +72,7 @@ public class ClientUI {
 				diskFullPath = keyboard.nextLine();
 				//TODO check valid directory path
 				client.setDirectory(diskFullPath);
+				check = false;
 			}
 		}
 		
@@ -128,7 +129,9 @@ public class ClientUI {
 		
 		client.setFilename(filename);
 		client.setMode(mode);
+		
 		client.retreiveFile();
+
 		
 		if (type.equals("r")) {
 			// read request
@@ -138,6 +141,7 @@ public class ClientUI {
 			} catch (TFTPException e) {
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 				System.out.println("Could not complete request, please try again.");
+				return;
 			}
 			
 			// send the request
