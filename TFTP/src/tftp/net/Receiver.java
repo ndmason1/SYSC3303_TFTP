@@ -143,8 +143,8 @@ public class Receiver
 				} catch(SocketTimeoutException e){
 					//response data packet not received, last ack packet may lost, resending...
 					try {
-						if (retransmission == 2){
-							System.out.println("Can not complete tranfer file, teminated");
+						if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+							System.out.println("Can not complete tranfer file, terminated");
 							return;
 						}
 						socket.send(sendPacket);
@@ -158,10 +158,7 @@ public class Receiver
 					System.exit(1);
 				}
 			}
-			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-				System.out.println("Can not complete tranfer file, terminated");
-				return;
-			}
+			
 			
 			receivedBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
 

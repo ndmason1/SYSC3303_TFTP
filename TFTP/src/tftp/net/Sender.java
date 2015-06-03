@@ -132,11 +132,6 @@ public class Sender {
 	        	}     
 	        }
 	        
-	        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-	        	System.out.println("Can not complete sending Request, terminated");
-	        	return;
-	        }
-
 			// parse ACK to ensure it is correct before continuing
 			try {
 				duplicatePacket = parser.parseAckPacket(reply, blockNum);
