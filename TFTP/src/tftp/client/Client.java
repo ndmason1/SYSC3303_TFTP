@@ -193,7 +193,7 @@ public class Client {
         	}
 		}
         
-        
+       
 		PacketParser parser = new PacketParser(targetIP, receivePacket.getPort());
 		
 		try {
@@ -214,11 +214,14 @@ public class Client {
 						receivePacket.getAddress(), receivePacket.getPort());						
 			} else {
 				// packet will be addressed to recipient as usual					
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						receivePacket.getAddress(), receivePacket.getPort());
 			}
 
 			try {			   
-				sendReceiveSocket.send(errPacket);			   
+			
+				sendReceiveSocket.send(errPacket);	
+		
 			} catch (IOException ex) {			   
 				System.out.println("Error sending ERROR packet!");
 				e.printStackTrace();
@@ -322,7 +325,8 @@ public class Client {
 						receivePacket.getAddress(), receivePacket.getPort());						
 			} else {
 				// packet will be addressed to recipient as usual					
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						receivePacket.getAddress(), receivePacket.getPort());
 			}
 
 			try {			   

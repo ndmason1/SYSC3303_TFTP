@@ -89,7 +89,8 @@ public class Receiver
 						initPacket.getAddress(), initPacket.getPort());						
 			} else {
 				// packet will be addressed to recipient as usual					
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						initPacket.getAddress(), initPacket.getPort());		
 			}
 
 			try {			   
@@ -140,8 +141,9 @@ public class Receiver
 				try {			  
 					socket.receive(receivePacket);
 					PacketReceived = true;
-					receivedBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
-					duplicatePacket = receivedBlockNum < blockNum;					
+					duplicatePacket = packetParser.parseDataPacket(receivePacket, blockNum);
+					//receivedBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
+					//duplicatePacket = receivedBlockNum < blockNum;					
 					
 				} catch(SocketTimeoutException e){
 					
@@ -163,7 +165,34 @@ public class Receiver
 				} catch(IOException ex) {
 					ex.printStackTrace();
 					System.exit(1);
+				} catch (TFTPException exception) {
+
+					// send error packet
+					DatagramPacket errPacket = null;
+
+					if (exception.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+						// address packet to the unknown TID
+						errPacket = packetUtil.formErrorPacket(exception.getErrorCode(), exception.getMessage(),
+								initPacket.getAddress(), initPacket.getPort());						
+					} else {
+						// packet will be addressed to recipient as usual					
+						errPacket = packetUtil.formErrorPacket(exception.getErrorCode(), exception.getMessage(),
+								initPacket.getAddress(), initPacket.getPort());	
+					}
+
+					try {			   
+						System.out.println("hi");
+						socket.send(errPacket);			   
+					} catch (IOException ex) {			   
+						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
+					}
+
+					// keep going if error was unknown TID
+					// otherwise, rethrow so the client UI can print a message
+					if (exception.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID)
+						throw exception;
 				}
+			
 			}
 			
 			
@@ -197,7 +226,8 @@ public class Receiver
 							receivePacket.getAddress(), receivePacket.getPort());						
 				} else {
 					// packet will be addressed to recipient as usual					
-					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+							receivePacket.getAddress(), receivePacket.getPort());
 				}
 
 				try {			   

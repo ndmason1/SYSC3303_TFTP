@@ -73,7 +73,8 @@ public class WriteHandlerThread extends WorkerThread {
 						receivePacket.getAddress(), receivePacket.getPort());						
 			} else {
 				// packet will be addressed to recipient as usual					
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
+				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						receivePacket.getAddress(), receivePacket.getPort());
 			}
 			
 			try {			   

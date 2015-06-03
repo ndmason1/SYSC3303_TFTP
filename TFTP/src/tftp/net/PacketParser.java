@@ -114,6 +114,10 @@ public class PacketParser {
 		
 		// check that the block number is what we expect
 		int blockNum = PacketUtil.getBlockNumberInt(data[2], data[3]);
+		if (blockNum == 0){
+			//Data Block number is 0 it is invalid
+			throw new TFTPException("Data Packet with block number 0 received ", PacketUtil.ERR_ILLEGAL_OP);
+		}
 		if (blockNum > expectedBlockNum) {
 			// Unexpected Data Packet throw exception
 			throw new TFTPException("Unexpected Block Number", PacketUtil.ERR_ILLEGAL_OP);
@@ -154,6 +158,7 @@ public class PacketParser {
 		
 		// check that the block number is what we expect
 		int blockNum = PacketUtil.getBlockNumberInt(data[2], data[3]);
+
 		if (blockNum > expectedBlockNum) {
 			//Unexpected ACK packet return 1
 			throw new TFTPException("Unexpected ACK packet ", PacketUtil.ERR_ILLEGAL_OP);
@@ -253,6 +258,7 @@ public class PacketParser {
 		if (! (mode.toLowerCase().equals("netascii") || mode.toLowerCase().equals("octet")) )			
 			throw new TFTPException("invalid mode", PacketUtil.ERR_ILLEGAL_OP);
 
+		
 		// should be at end of packet
 		if (i+1 != packet.getLength())			
 			throw new TFTPException("incorrect packet length", PacketUtil.ERR_ILLEGAL_OP);
