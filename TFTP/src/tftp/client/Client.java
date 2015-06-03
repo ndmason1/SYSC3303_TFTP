@@ -208,15 +208,11 @@ public class Client {
 			// send error packet
 			DatagramPacket errPacket = null;			
 
-			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-				// address packet to the unknown TID
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-						receivePacket.getAddress(), receivePacket.getPort());						
-			} else {
-				// packet will be addressed to recipient as usual					
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+
+
+			// packet will be addressed to recipient as usual					
+			errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
 						receivePacket.getAddress(), receivePacket.getPort());
-			}
 
 			try {			   
 			
@@ -319,15 +315,11 @@ public class Client {
 			// send error packet
 			DatagramPacket errPacket = null;			
 
-			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-				// address packet to the unknown TID
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-						receivePacket.getAddress(), receivePacket.getPort());						
-			} else {
-				// packet will be addressed to recipient as usual					
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-						receivePacket.getAddress(), receivePacket.getPort());
-			}
+
+			// packet will be addressed to recipient as usual					
+			errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+					receivePacket.getAddress(), receivePacket.getPort());	
+			
 
 			try {			   
 				sendReceiveSocket.send(errPacket);			   

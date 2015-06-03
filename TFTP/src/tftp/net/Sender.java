@@ -152,7 +152,8 @@ public class Sender {
 				} else {
 					// packet will be addressed to recipient as usual					
 					errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-							reply.getAddress(), reply.getPort());
+							reply.getAddress(), reply.getPort());		
+
 				}
 				
 				try {			   
