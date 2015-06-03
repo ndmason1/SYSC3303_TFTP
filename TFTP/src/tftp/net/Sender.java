@@ -70,7 +70,6 @@ public class Sender {
 		}
 		
 		int blockNum = 1;
-		boolean duplicatePacket = false;
 
 		byte[] sendBuf = new byte[512]; // need to make this exactly our block size so we only read that much
 		byte[] recvBuf = new byte[PacketUtil.BUF_SIZE];
@@ -97,7 +96,7 @@ public class Sender {
 
 			printToConsole(String.format("Sending DATA block %d with %d byte payload.", blockNum, bytesRead));
 			try {
-				if (!duplicatePacket) {socket.send(sendPacket);} // if duplicate packet is false we ignore and don't send anything.
+				socket.send(sendPacket); // if duplicate packet is false we ignore and don't send anything.
 			} catch (IOException e) {
 				throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}
@@ -134,7 +133,7 @@ public class Sender {
 	        
 			// parse ACK to ensure it is correct before continuing
 			try {
-				duplicatePacket = parser.parseAckPacket(reply, blockNum);
+				parser.parseAckPacket(reply, blockNum);
 			} catch (ErrorReceivedException e) {
 				// the other side sent an error packet, don't send a response				
 				// rethrow so the owner of this Sender knows whats up
@@ -164,11 +163,7 @@ public class Sender {
 				// rethrow so the owner of this Sender knows whats up
 				throw e;
 			}
-			
-			if (!duplicatePacket){
-				blockNum++;
-			}
-			
+			blockNum++;
 
 		} while (!done);
 		
