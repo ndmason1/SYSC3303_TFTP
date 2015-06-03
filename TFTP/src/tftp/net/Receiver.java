@@ -140,16 +140,22 @@ public class Receiver
 				try {			  
 					socket.receive(receivePacket);
 					PacketReceived = true;
-					//
+					receivedBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
+					duplicatePacket = receivedBlockNum < blockNum;					
+					
 				} catch(SocketTimeoutException e){
-					//response data packet not received, last ack packet may lost, resending...
+					
+					printToConsole("Error: Response data packet not received, last ack packet may lost, resending...");
 					try {
-						if (retransmission == 2){
-							System.out.println("Can not complete tranfer file, teminated");
+						if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+							System.out.println("Can not complete tranfer file, terminated");
 							return;
 						}
-						socket.send(sendPacket);
-						retransmission++;
+						if (!duplicatePacket) {
+							socket.send(sendPacket);
+							retransmission++;
+						}
+						
 					} catch (IOException ew) {
 						throw new TFTPException(ew.getMessage(), PacketUtil.ERR_UNDEFINED);
 					}
@@ -159,10 +165,7 @@ public class Receiver
 					System.exit(1);
 				}
 			}
-			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-				System.out.println("Can not complete tranfer file, terminated");
-				return;
-			}
+			
 			
 			receivedBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
 
@@ -312,7 +315,7 @@ public class Receiver
 			} catch (IOException ex) {			   
 				throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
 			}	
-
+				
 			throw new TFTPException(msg, PacketUtil.ERR_DISK_FULL);
 
 		}

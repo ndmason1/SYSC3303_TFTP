@@ -15,6 +15,7 @@ import java.net.InetAddress;
 import java.net.SocketException;
 
 import tftp.net.PacketParser;
+import tftp.sim.ErrorSimulator;
 
 public abstract class WorkerThread extends Thread {
 	
@@ -64,8 +65,8 @@ public abstract class WorkerThread extends Thread {
 		this.reqPacket = reqPacket;
 		clientIP = reqPacket.getAddress();
 		clientPort = reqPacket.getPort();
-		setDefaultTimeout(2000);
-		
+		setDefaultTimeout(ErrorSimulator.TIMEOUT_MS);
+
 		try {
 			sendReceiveSocket = new DatagramSocket();
 			sendReceiveSocket.setSoTimeout(getDefaultTimeout());

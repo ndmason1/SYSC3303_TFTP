@@ -165,7 +165,7 @@ public class Client {
 		// get server response - the port it is sent from should be used as the server TID
         boolean PacketReceived = false;
         int retransmission = 0;
-        while (!PacketReceived && retransmission < DEFAULT_RETRY_TRANSMISSION){
+        while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
         	try {			  
         		sendReceiveSocket.receive(receivePacket);
         		PacketReceived = true;
@@ -173,6 +173,9 @@ public class Client {
         		//no response received after 1 sec, resending
         		// TODO  how to resend twice if no response again
         		try {
+        			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+        				throw new TFTPException("maximum number of retransmissions reached, aborting operation", PacketUtil.ERR_UNDEFINED);
+        			}
         			System.out.println("Socket Timeout for response of request packet, resending...");
         			sendReceiveSocket.send(sendPacket);	
         			retransmission ++;
@@ -190,9 +193,6 @@ public class Client {
         	}
 		}
         
-        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-        	throw new TFTPException("maximum number of retransmissions reached, aborting operation", PacketUtil.ERR_UNDEFINED);
-        }
         
 		PacketParser parser = new PacketParser(targetIP, receivePacket.getPort());
 		
