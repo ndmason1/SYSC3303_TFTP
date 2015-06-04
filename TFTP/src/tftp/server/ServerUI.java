@@ -20,11 +20,11 @@ public class ServerUI {
 	}
 	
 	public void showUI() {
-		System.out.println("TFTP server running [v1.0 - LOCALHOST ONLY] (press Q to terminate) ");
-		System.out.println("Waiting for requests...");
+		System.out.println("TFTP server running [v1.0 - LOCALHOST ONLY] (press Q to terminate) ");		
 		
 		ServerThread st = new ServerThread();
 		st.start();
+		System.out.println("Waiting for requests...");
 		
 		String input = keyboard.nextLine();
 		input = input.replaceAll(" ", "");

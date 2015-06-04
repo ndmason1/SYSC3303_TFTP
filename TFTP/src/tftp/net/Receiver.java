@@ -122,6 +122,10 @@ public class Receiver
 		boolean done = initPacket.getLength() < 516;		
 
 		while (!done) {
+			
+			// expect next DATA to have increased block number
+			oldBlockNum = blockNum;
+			blockNum++;
 
 			boolean PacketReceived = false;
 			int retransmission = 0;
@@ -136,10 +140,7 @@ public class Receiver
 				
 				try {			  
 					socket.receive(receivePacket);
-					PacketReceived = true;
-					duplicatePacket = packetParser.parseDataPacket(receivePacket, blockNum);
-					//receivedBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
-					//duplicatePacket = receivedBlockNum < blockNum;					
+					PacketReceived = true;					
 					
 				} catch(SocketTimeoutException e){
 					
@@ -161,33 +162,7 @@ public class Receiver
 				} catch(IOException ex) {
 					ex.printStackTrace();
 					System.exit(1);
-				} catch (TFTPException exception) {
-
-					// send error packet
-					DatagramPacket errPacket = null;
-
-					if (exception.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-						// address packet to the unknown TID
-						errPacket = packetUtil.formErrorPacket(exception.getErrorCode(), exception.getMessage(),
-								initPacket.getAddress(), initPacket.getPort());						
-					} else {
-						// packet will be addressed to recipient as usual					
-						errPacket = packetUtil.formErrorPacket(exception.getErrorCode(), exception.getMessage(),
-								initPacket.getAddress(), initPacket.getPort());	
-					}
-
-					try {			   
-						System.out.println("hi");
-						socket.send(errPacket);			   
-					} catch (IOException ex) {			   
-						throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
-					}
-
-					// keep going if error was unknown TID
-					// otherwise, rethrow so the client UI can print a message
-					if (exception.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID)
-						throw exception;
-				}
+				} 
 			
 			}
 			
@@ -196,9 +171,7 @@ public class Receiver
 
 			printToConsole(String.format("DATA %d received", receivedBlockNum));
 			
-			oldBlockNum = blockNum;
-			// increment block number so we can check if received packet has expected block number
-			blockNum++;
+			
 
 			// parse the response packet to ensure it is correct before continuing
 			try {
