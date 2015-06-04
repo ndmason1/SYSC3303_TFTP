@@ -6,7 +6,7 @@
  * This file was created specifically for the course SYSC 3303.
  */
 
-package tftp.server.thread;
+package tftp.net;
 
 import java.net.DatagramPacket;
 

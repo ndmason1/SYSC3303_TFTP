@@ -15,6 +15,7 @@ import java.net.DatagramPacket;
 import java.nio.file.Paths;
 
 import tftp.exception.TFTPException;
+import tftp.net.OPcodeError;
 import tftp.net.PacketUtil;
 import tftp.net.Sender;
 

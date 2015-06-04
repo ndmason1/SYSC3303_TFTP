@@ -15,6 +15,7 @@ import java.net.SocketTimeoutException;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
+import tftp.net.OPcodeError;
 import tftp.net.PacketUtil;
 import tftp.net.Receiver;
 

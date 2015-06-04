@@ -8,10 +8,13 @@
 
 package tftp.net;
 
+import java.io.IOException;
 import java.net.DatagramPacket;
+import java.net.DatagramSocket;
 import java.net.InetAddress;
+import java.net.SocketException;
 
-import tftp.server.thread.OPcodeError;
+import tftp.sim.ErrorSimUtil;
 
 public class PacketUtil {
 	
@@ -126,48 +129,208 @@ public class PacketUtil {
 		return errorPacket;
 	}
 	
-	/* return block number or -1 if bad packet */
-	public int parseAckPacket(DatagramPacket packet) {
-		byte[] data = packet.getData();
-		if (data[0] != 0) return -1;
-		if (data[1] != 4) return -1;
-		return getBlockNumberInt(data[2], data[3]);
+	/**
+	 * Sends a packet to the given process and displays information.
+	 * A similar version of this method exists in ErrorSimulator, but this one has more parameters and
+	 * can be used by other classes.
+	 * 	 
+	 *  @param sendSocket		the DatagramSocket to use for sending
+	 *  @param sendPAcket		the DatagramPacket to send
+	 *  @param recvProcess		the process (client or server) who should be listening for the packet
+	 *  @param sendPacketStr	a string describing the packet being sent, which is displayed
+	 */
+	public static void sendPacketToProcess(DatagramSocket sendSocket, DatagramPacket sendPacket, 
+			ProcessType recvProcess, String sendPacketStr) {		
+				
+		System.out.printf("sending %s packet to %s (IP: %s, port %d) ... ", 
+				sendPacketStr, recvProcess, sendPacket.getAddress(), sendPacket.getPort());		
+		
+		try {
+			sendSocket.send(sendPacket);
+		} catch (IOException e) {
+			System.out.printf("IOException caught sending %s packet: %s", recvProcess, e.getMessage());
+			System.out.println("cannot proceed, terminating simulation");
+			return;
+		}	
+		
+		PacketType sendType = getPacketType(sendPacket);		
+		String label = sendType.name();
+		// if DATA or ACK packet, display block number		
+		if (sendType == PacketType.DATA || sendType == PacketType.ACK)
+			label += " " + getBlockNumber(sendPacket);
+		
+		System.out.printf("sent %s packet ", label);
+		printOpcode(sendPacket);
 	}
 	
-	/* return block number or -1 if bad packet */
-	public int parseDataPacket(DatagramPacket packet) {
-		byte[] data = packet.getData();
-		if (data[0] != 0) return -1;
-		if (data[1] != 3) return -1;
-		return getBlockNumberInt(data[2], data[3]);
+
+	/**
+	 * Returns the block number of an ACK or DATA packet. 
+	 * 
+	 *  @param packet	the packet to inspect
+	 *  @return 		the block number
+	 */
+	public static int getBlockNumber(DatagramPacket packet) {
+		PacketType type = getPacketType(packet);
+		if (type != PacketType.DATA && type != PacketType.ACK)
+			throw new IllegalArgumentException();
+		
+		return PacketUtil.getBlockNumberInt(packet.getData()[2], packet.getData()[3]);
 	}
-//	
-//	/* return error code */
-//	public static int parseErrorPacket(DatagramPacket packet) {
-//		byte[] data = packet.getData();
-//		if (data[0] != 0) return -1;
-//		if (data[1] != 5) return -1;
-//		if (data[2] != 0) return -1;
-//		return data[3];
-//	}
-//	
-//	/* return error message */
-//	public static String parseErrorPacketMessage(DatagramPacket packet) throws TFTPPacketException {
-//		byte[] data = packet.getData();
-//		int i = 4;
-//		StringBuilder sb = new StringBuilder();
-//		while (data[i] != 0x00) {
-//			sb.append((char)data[i]);
-//			// reject non-printable values
-//			if (data[i] < 0x20 || data[i] > 0x7F)
-//				throw new TFTPPacketException("non-printable data inside error message: byte " + i, PacketUtil.ERR_ILLEGAL_OP);			
-//			i++;
-//		}
-//		String msg = sb.toString();
-//		return msg;
-//				
-//	}
 	
+	/**
+	 * Returns the error code from an ERROR packet. 
+	 * 
+	 *  @param packet	the packet to inspect
+	 *  @return 		the error code
+	 */
+	public static int getErrorCode(DatagramPacket packet) {
+		PacketType type = getPacketType(packet);
+		if (type != PacketType.ERROR)
+			throw new IllegalArgumentException();
+		
+		return packet.getData()[3];
+	}
+	
+	/**
+	 * Listens for a packet from the given process and displays information.
+	 * Sets receivedPacket and receivedPacketType to the packet that was received and its type, respectively.
+	 * A similar version of this method exists in ErrorSimulator, but this one returns a DatagramPacket and
+	 * can be used by other classes.
+	 * 
+	 *  @param recvSocket			the DatagramSocket to listen on
+	 *  @param sendProcess			the process (client or server) expected to send a packet
+	 *  @param expectedPacketStr	a string describing the expected type of packet to receive, which is displayed
+	 *  @return 					the packet that was received
+	 */
+	public static DatagramPacket receivePacketFromProcess(DatagramSocket recvSocket, ProcessType sendProcess, 
+			String expectedPacketStr) {
+		
+		byte data[] = new byte[PacketUtil.BUF_SIZE];		
+		DatagramPacket receivePacket = new DatagramPacket(data, data.length);
+		
+		// listen for a packet from given source process
+		// note this function doesn't actually enforce the packet type received, since it might not always matter
+		System.out.printf("listening on port %s for %s packet from %s ... ", recvSocket.getLocalPort(), 
+				expectedPacketStr, sendProcess);
+		try {
+			recvSocket.receive(receivePacket);
+		} catch (IOException e) {
+			System.out.printf("IOException caught receiving %s packet: %s", sendProcess, e.getMessage());
+			System.out.println("cannot proceed, terminating simulation");
+			System.exit(1);
+		}	
+		
+		PacketType receivedPacketType = getPacketType(receivePacket);		
+		String label = receivedPacketType.name();
+		
+		// if DATA or ACK packet, display block number		
+		if (receivedPacketType == PacketType.DATA || receivedPacketType == PacketType.ACK)
+			label += " " + getBlockNumber(receivePacket);
+		
+		System.out.printf("received %s packet ", label);
+		printOpcode(receivePacket);
+		
+		return receivePacket;
+	}
+	
+	/**
+	 * Utility function to display the opcode of a TFTP packet.
+	 * 
+	 *  @param packet	the packet
+	 */
+	public static void printOpcode(DatagramPacket packet) {
+		byte[] data = packet.getData();
+		System.out.printf("[opcode: %02x]\n", data[1]);
+	}
+	
+	/**
+	 * Utility function to check if a packet is an ERROR packet.
+	 * 
+	 *  @param packet	the packet
+	 *  @return			true if ERROR packet
+	 */
+	public static boolean isErrorPacket(DatagramPacket packet) {
+		return packet.getData()[1] == PacketUtil.ERROR_FLAG;
+	}
+	
+	/**
+	 * Get the type of a TFTP packet.   
+	 * 
+	 *  @param packet	the packet to inspect
+	 *  @return 		the type of the packet
+	 */
+	public static PacketType getPacketType(DatagramPacket packet) {
+		
+		switch (packet.getData()[1]) {
+		case PacketUtil.READ_FLAG:
+			return PacketType.RRQ;
+			
+		case PacketUtil.WRITE_FLAG:
+			return PacketType.WRQ;
+			
+		case PacketUtil.DATA_FLAG:
+			return PacketType.DATA;
+			
+		case PacketUtil.ACK_FLAG:
+			return PacketType.ACK;
+			
+		case PacketUtil.ERROR_FLAG:
+			return PacketType.ERROR;
+			
+		default:
+			// we should only be parsing server or client packets so 
+			// only genuine network errors will cause this
+			return null; 
+		}
+	}
+	
+	/**
+	 * Utility function to return the length of a filename contained in a RRQ or WRQ packet.
+	 * 
+	 *  @param data		the contents of a request packet
+	 *  @return 		the length of the string
+	 */
+	public static int getFilenameLength (byte[] data) {
+
+		int length = 0;
+		for (int i = 2; i < data.length; i++) {
+			if (data[i] == 0) {
+				length = i - 2;
+				break;
+			}
+		}
+
+		return length;
+	}
+	
+	/**
+	 * Utility function to return the error message contained in an ERROR packet.
+	 * 
+	 *  @param data		the contents of an ERROR packet
+	 *  @return 		the error message
+	 */
+	public static String getErrMessage(byte[] data) {
+
+		StringBuilder sb = new StringBuilder();
+		
+		for (int i = 4; i < data.length; i++) {
+			sb.append((char)data[i]);
+			if (data[i] == 0)				
+				break;
+		}
+
+		return sb.toString();
+	}
+	
+	public static void setSocketTimeout(DatagramSocket socket, int timeoutMs) {
+		try {
+			socket.setSoTimeout(timeoutMs);
+		} catch (SocketException e) {
+			e.printStackTrace();
+		}
+	}
+
 	public static byte[] getBlockNumberBytes(int blockNum) {
 		byte[] bytes = new byte[2];
 		bytes[1] = (byte) (blockNum & 0xFF);

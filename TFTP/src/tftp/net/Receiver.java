@@ -23,7 +23,6 @@ import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
 import tftp.server.thread.WorkerThread;
 import tftp.sim.ErrorSimUtil;
-import tftp.sim.PacketType;
 
 public class Receiver
 {    
@@ -193,7 +192,7 @@ public class Receiver
 			}
 			
 			
-			receivedBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
+			receivedBlockNum = PacketUtil.getBlockNumber(receivePacket);
 
 			printToConsole(String.format("DATA %d received", receivedBlockNum));
 			
