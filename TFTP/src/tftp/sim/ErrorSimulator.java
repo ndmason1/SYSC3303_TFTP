@@ -1216,15 +1216,16 @@ public class ErrorSimulator {
 							return;
 						}
 						
-						if (startingRequestType == PacketType.RRQ) {
-							// client send ACK, server send DATA
-							getAndSendRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
-									ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, numDrops);
-						} else {
-							// client send DATA, server send ACK
-							getAndSendRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
-									ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, numDrops);
-						}
+//						
+//						if (startingRequestType == PacketType.RRQ) {
+//							// client send ACK, server send DATA
+//							getAndSendRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+//									ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, numDrops);
+//						} else {
+//							// client send DATA, server send ACK
+//							getAndSendRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
+//									ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, numDrops);
+//						}
 
 //						System.out.println("additional retransmission expected from server");
 //						System.out.println("finishing transfer...");
