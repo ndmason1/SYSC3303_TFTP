@@ -8,9 +8,7 @@
 
 package tftp.client;
 
-import java.nio.file.*;
 import java.io.File;
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -18,14 +16,15 @@ import java.net.SocketException;
 import java.net.SocketTimeoutException;
 import java.net.UnknownHostException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 
 import tftp.exception.TFTPException;
 import tftp.net.PacketParser;
 import tftp.net.PacketUtil;
+import tftp.net.ProcessType;
 import tftp.net.Receiver;
 import tftp.net.Sender;
-import tftp.sim.ErrorSimUtil;
 import tftp.sim.ErrorSimulator;
 import tftp.exception.*;
 
@@ -147,50 +146,29 @@ public class Client {
 		// set up PacketUtil object to generate packets with
 		PacketUtil packetUtil = new PacketUtil(targetIP, targetPort);		
 
-		// create send packet
-		sendPacket = packetUtil.formRrqPacket(getFilename(), getMode());
-	    
-		try {
-			sendReceiveSocket.send(sendPacket);	
-		} catch (IOException e) {
-			System.out.println("Error sending request packet!");
-			e.printStackTrace();
-			cleanup();
-			return;
-		}
-
-		byte data[] = new byte[PacketUtil.BUF_SIZE];
-		receivePacket = new DatagramPacket(data, data.length);		
+		// send request packet to server
+		sendPacket = packetUtil.formRrqPacket(getFilename(), getMode());		
+		PacketUtil.sendPacketToProcess("", sendReceiveSocket, sendPacket, ProcessType.SERVER, "RRQ");	    
 
 		// get server response - the port it is sent from should be used as the server TID
-        boolean PacketReceived = false;
+        boolean packetReceived = false;
         int retransmission = 0;
-        while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
+        
+        while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
         	try {			  
-        		sendReceiveSocket.receive(receivePacket);
-        		PacketReceived = true;
+        		receivePacket = PacketUtil.receivePacketOrTimeout("", sendReceiveSocket, ProcessType.SERVER, "DATA");
+        		packetReceived = true;
         	} catch(SocketTimeoutException ex){
         		//no response received after 1 sec, resending
         		// TODO  how to resend twice if no response again
-        		try {
-        			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-        				throw new TFTPException("maximum number of retransmissions reached, aborting operation", PacketUtil.ERR_UNDEFINED);
-        			}
-        			System.out.println("Socket Timeout for response of request packet, resending...");
-        			sendReceiveSocket.send(sendPacket);	
-        			retransmission ++;
-        		} catch (IOException e) {
-        			System.out.println("Error sending request packet!");
-        			e.printStackTrace();
-        			cleanup();
-        			return;
-        		}	    
-        	} catch(IOException e) {
-        		System.out.println("Error receiving response to request packet!");
-        		e.printStackTrace();
-        		cleanup();
-        		return;
-        	}
+    			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+    				throw new TFTPException("maximum number of retransmissions reached, aborting operation", PacketUtil.ERR_UNDEFINED);
+    			}
+    			System.out.println("Socket Timeout for response of request packet, resending...");
+    			
+    			PacketUtil.sendPacketToProcess("", sendReceiveSocket, sendPacket, ProcessType.SERVER, "RRQ");
+    			retransmission ++;
+        	} 
 		}
         
        
@@ -205,95 +183,56 @@ public class Client {
 			throw e;
 
 		} catch(TFTPException e){
-			// send error packet
-			DatagramPacket errPacket = null;			
-
-
-
-			// packet will be addressed to recipient as usual					
-			errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+			
+			// send error packet to TID of packet					
+			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
 						receivePacket.getAddress(), receivePacket.getPort());
 
-			try {			   
-			
-				sendReceiveSocket.send(errPacket);	
-		
-			} catch (IOException ex) {			   
-				System.out.println("Error sending ERROR packet!");
-				e.printStackTrace();
-				cleanup();
-				return;
-			}
+			PacketUtil.sendPacketToProcess("", sendReceiveSocket, errPacket, ProcessType.SERVER, "ERROR");
 
-			// keep going if error was unknown TID
-			// otherwise, rethrow so the client UI can print a message
-			if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID)
-				throw e;
+			// unknown TID will never happen here since we just learned the server TID from this packet
+			// rethrow so the client UI can print a message
+			throw e;
 		}
 
 		// request is good, set up a receiver to proceed with the transfer
-		Receiver r = new Receiver(sendReceiveSocket, receivePacket.getPort());
+		Receiver r = new Receiver(ProcessType.SERVER, sendReceiveSocket, receivePacket.getPort());
 		r.receiveFile(receivePacket, getFile());
 	}
 
 	public void sendWriteRequest() throws TFTPException {
-
 		
 		System.out.println("Starting write of file : " + getFilename() + " to server...");
 		
 		// set up PacketUtil object to generate packets with
 		PacketUtil packetUtil = new PacketUtil(targetIP, targetPort);		
-
-		checkValidWriteOperation();
+		
 		// create send packet
 		sendPacket = packetUtil.formWrqPacket(getFilename(), getMode());
 
 		// send packet to server
-		try {
-			sendReceiveSocket.send(sendPacket);
-		} catch (IOException e) {
-			System.out.println("Error sending request packet!");
-			e.printStackTrace();
-			cleanup();
-			return;
-		}
-
-		// create recv packet
-		byte data[] = new byte[PacketUtil.BUF_SIZE];
-		receivePacket = new DatagramPacket(data, data.length);
-
-        boolean PacketReceived = false;
+		PacketUtil.sendPacketToProcess("", sendReceiveSocket, sendPacket, ProcessType.SERVER, "RRQ");
+        boolean packetReceived = false;
         int retransmission = 0;
         
-        while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
+        while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
         	try {			  
-        		sendReceiveSocket.receive(receivePacket);
-        		PacketReceived = true;
+        		receivePacket = PacketUtil.receivePacketOrTimeout("", sendReceiveSocket, ProcessType.SERVER, "ACK");
+        		packetReceived = true;
         	} catch(SocketTimeoutException ex){
         		//no response received after 1 sec, resending
         		// TODO  how to resend twice if no response again
-        		try {
-        			if (retransmission == 2){
-        				System.out.println("Can not complete sending Request, teminated");
-        				cleanup();
-        				return;
-        			}
+        		
+    			if (retransmission == 2){
+    				System.out.println("Can not complete sending Request, teminated");
+    				cleanup();
+    				return;
+    			}
 
-        			System.out.println("Socket Timeout for response of request packet, resending...");
-        			sendReceiveSocket.send(sendPacket);	
-        			retransmission ++;
-        		} catch (IOException e) {
- 
-        			System.out.println("Error sending request packet!");
-        			e.printStackTrace();
-        			cleanup();
-        			return;
-        		}	    
-        	} catch(IOException e) {
-        		System.out.println("Error receiving response to request packet!");
-        		e.printStackTrace();
-        		cleanup();
-        		return;
+    			System.out.println("Socket Timeout for response of request packet, resending...");
+    			
+    			PacketUtil.sendPacketToProcess("", sendReceiveSocket, sendPacket, ProcessType.SERVER, "RRQ");	
+    			retransmission ++;
         	}
 		}
         
@@ -304,6 +243,7 @@ public class Client {
         
 		PacketParser parser = new PacketParser(receivePacket.getAddress(), receivePacket.getPort());
 
+		// parse ACK 0 packet
 		try{
 			parser.parseAckPacket(receivePacket, 0);
 		} catch(ErrorReceivedException e) {
@@ -313,22 +253,12 @@ public class Client {
 
 		} catch(TFTPException e){
 			// send error packet
-			DatagramPacket errPacket = null;			
-
-
-			// packet will be addressed to recipient as usual					
+			DatagramPacket errPacket = null;	
+					
 			errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-					receivePacket.getAddress(), receivePacket.getPort());	
+					receivePacket.getAddress(), receivePacket.getPort());
 			
-
-			try {			   
-				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {			   
-				System.out.println("Error sending ERROR packet!");
-				e.printStackTrace();
-				cleanup();
-				return;
-			}
+			PacketUtil.sendPacketToProcess("", sendReceiveSocket, errPacket, ProcessType.SERVER, "ERROR");			
 
 			// rethrow so the client UI can print a message
 			throw e;
@@ -336,14 +266,12 @@ public class Client {
 
 		// set up a sender to proceed with the transfer
 
-		Sender s = new Sender(sendReceiveSocket, receivePacket.getPort());
+		Sender s = new Sender(ProcessType.SERVER, sendReceiveSocket, receivePacket.getPort());
 		try {
 			s.sendFile(getFile());
 		} catch (TFTPException e) {
 			// just throw it, client UI can print message
 			throw e;
-//			System.out.println("ERROR CODE " + e.getErrorCode());
-//			System.out.println(e.getMessage());
 		}
 	}
 

@@ -15,8 +15,6 @@ import java.net.InetAddress;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
 
-import tftp.sim.ErrorSimUtil;
-
 public class PacketUtil {
 	
 	private InetAddress receiverIP;
@@ -133,17 +131,17 @@ public class PacketUtil {
 	/**
 	 * Sends a packet to the given process and displays information. 
 	 * 
-	 * 	@param senderStr		a string describing the sender (useful for identifiying server threads) 
+	 * 	@param senderLabel		a string describing the sender (useful for identifying server threads) 
 	 *  @param sendSocket		the DatagramSocket to use for sending
 	 *  @param sendPacket		the DatagramPacket to send
 	 *  @param recvProcess		the process (client or server) who should be listening for the packet
 	 *  @param sendPacketStr	a string describing the packet being sent, which is displayed
 	 */
-	public static void sendPacketToProcess(String senderStr, DatagramSocket sendSocket, DatagramPacket sendPacket, 
+	public static void sendPacketToProcess(String senderLabel, DatagramSocket sendSocket, DatagramPacket sendPacket, 
 			ProcessType recvProcess, String sendPacketStr) {		
 				
 		System.out.printf("%ssending %s packet to %s (IP: %s, port %d) ... ", 
-				senderStr, sendPacketStr, recvProcess, sendPacket.getAddress(), sendPacket.getPort());		
+				senderLabel, sendPacketStr, recvProcess, sendPacket.getAddress(), sendPacket.getPort());		
 		
 		try {
 			sendSocket.send(sendPacket);
@@ -154,37 +152,36 @@ public class PacketUtil {
 		}	
 		
 		PacketType sendType = getPacketType(sendPacket);		
-		String label = sendType.name();
+		String packetLabel = sendType.name();
 		// if DATA or ACK packet, display block number
-		// if ERROR, send error packet
+		// if ERROR, display error code
 		if (sendType == PacketType.DATA || sendType == PacketType.ACK)
-			label += " " + getBlockNumber(sendPacket);
+			packetLabel += " " + getBlockNumber(sendPacket);
 		else if (sendType == PacketType.ERROR)
-			label += " " + getErrorCode(sendPacket);
+			packetLabel += " " + getErrorCode(sendPacket);
 		
-		System.out.printf("sent %s packet ", label);
-		printOpcode(sendPacket);
+		System.out.printf("\n%s  sent %s packet ", senderLabel, packetLabel);
+		printOpcodeAndLength(sendPacket);
 	}
 	
 	/**
 	 * Listens for a packet from the given process and displays information.
 	 * The socket may timeout, in which case a SocketTimeoutException is thrown.
-	 * Sets receivedPacket and receivedPacketType to the packet that was 
-	 * received and its type, respectively.
-	 * 
+	 *
+	 *  @param receiverLabel		a string describing the receiver (useful for identifying server threads) 
 	 *  @param recvSocket			the DatagramSocket to listen on
 	 *  @param sendProcess			the process (client or server) expected to send a packet
 	 *  @param expectedPacketStr	a string describing the expected type of packet to receive, which is displayed
 	 *  @throws SocketTimeoutException 	if a timeout was set and has expired
 	 */
-	public static DatagramPacket receivePacketOrTimeout(DatagramSocket recvSocket, ProcessType sendProcess, String expectedPacketStr) 
-			throws SocketTimeoutException {
+	public static DatagramPacket receivePacketOrTimeout(String receiverLabel, DatagramSocket recvSocket, 
+			ProcessType sendProcess, String expectedPacketStr) throws SocketTimeoutException {
 
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
 		DatagramPacket receivePacket = new DatagramPacket(data, data.length);
 		
 		// listen for a packet from given source process
-		System.out.printf("listening on port %s for %s packet from %s ... ", recvSocket.getLocalPort(), 
+		System.out.printf("%slistening on port %s for %s packet from %s ... ", receiverLabel, recvSocket.getLocalPort(), 
 				expectedPacketStr, sendProcess);
 		try {
 			recvSocket.receive(receivePacket);
@@ -197,16 +194,17 @@ public class PacketUtil {
 		}
 		
 		PacketType receivedPacketType = getPacketType(receivePacket);		
-		String label = receivedPacketType.name();
+		String packetLabel = receivedPacketType.name();
 		
-		// if DATA or ACK packet, display block number		
+		// if DATA or ACK packet, display block number
+		// if ERROR, display error code
 		if (receivedPacketType == PacketType.DATA || receivedPacketType == PacketType.ACK)
-			label += " " + getBlockNumber(receivePacket);
+			packetLabel += " " + getBlockNumber(receivePacket);
 		else if (receivedPacketType == PacketType.ERROR)
-			label += " " + getErrorCode(receivePacket);
+			packetLabel += " " + getErrorCode(receivePacket);
 		
-		System.out.printf("received %s packet ", label);
-		printOpcode(receivePacket);
+		System.out.printf("\n%s  received %s packet ", receiverLabel, packetLabel);
+		printOpcodeAndLength(receivePacket);
 		
 		return receivePacket;
 	}
@@ -214,23 +212,21 @@ public class PacketUtil {
 	
 	/**
 	 * Listens for a packet from the given process and displays information.
-	 * Sets receivedPacket and receivedPacketType to the packet that was received and its type, respectively.
-	 * A similar version of this method exists in ErrorSimulator, but this one returns a DatagramPacket and
-	 * can be used by other classes.
 	 * 
+	 *  @param receiverLabel		a string describing the receiver (useful for identifying server threads)
 	 *  @param recvSocket			the DatagramSocket to listen on
 	 *  @param sendProcess			the process (client or server) expected to send a packet
 	 *  @param expectedPacketStr	a string describing the expected type of packet to receive, which is displayed
 	 *  @return 					the packet that was received
 	 */
-	public static DatagramPacket receivePacketFromProcess(DatagramSocket recvSocket, ProcessType sendProcess, 
-			String expectedPacketStr) {
+	public static DatagramPacket receivePacketFromProcess(String receiverLabel, DatagramSocket recvSocket, 
+			ProcessType sendProcess, String expectedPacketStr) {
 		
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
 		DatagramPacket receivePacket = new DatagramPacket(data, data.length);
 		
 		// listen for a packet from given source process
-		System.out.printf("listening on port %s for %s packet from %s ... ", recvSocket.getLocalPort(), 
+		System.out.printf("%slistening on port %s for %s packet from %s ... ", receiverLabel, recvSocket.getLocalPort(), 
 				expectedPacketStr, sendProcess);
 		try {
 			recvSocket.receive(receivePacket);
@@ -241,14 +237,17 @@ public class PacketUtil {
 		}	
 		
 		PacketType receivedPacketType = getPacketType(receivePacket);		
-		String label = receivedPacketType.name();
+		String packetLabel = receivedPacketType.name();
 		
-		// if DATA or ACK packet, display block number		
+		// if DATA or ACK packet, display block number
+		// if ERROR, display error code
 		if (receivedPacketType == PacketType.DATA || receivedPacketType == PacketType.ACK)
-			label += " " + getBlockNumber(receivePacket);
-		
-		System.out.printf("received %s packet ", label);
-		printOpcode(receivePacket);
+			packetLabel += " " + getBlockNumber(receivePacket);
+		else if (receivedPacketType == PacketType.ERROR)
+			packetLabel += " " + getErrorCode(receivePacket);
+
+		System.out.printf("\n%s  received %s packet ", receiverLabel, packetLabel);
+		printOpcodeAndLength(receivePacket);
 		
 		return receivePacket;
 	}
@@ -288,10 +287,10 @@ public class PacketUtil {
 	 * 
 	 *  @param packet	the packet
 	 */
-	public static void printOpcode(DatagramPacket packet) {
-		byte[] data = packet.getData();
-		System.out.printf("[opcode: %02x]\n", data[1]);
-	}
+	public static void printOpcodeAndLength(DatagramPacket packet) {
+		byte[] data = packet.getData();		
+		System.out.printf("[opcode: %02x, length: %db]\n", data[1], packet.getLength());
+	}	
 	
 	/**
 	 * Utility function to check if a packet is an ERROR packet.
