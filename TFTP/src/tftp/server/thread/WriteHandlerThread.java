@@ -65,7 +65,7 @@ public class WriteHandlerThread extends WorkerThread {
 
 			// send error packet
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-						receivePacket.getAddress(), receivePacket.getPort());
+						reqPacket.getAddress(), reqPacket.getPort());
 			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, errPacket, ProcessType.CLIENT, "ERROR");
 			
 			printToConsole("request cannot be processed, ending this thread");			

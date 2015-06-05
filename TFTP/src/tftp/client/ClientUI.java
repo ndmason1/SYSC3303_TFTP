@@ -95,18 +95,17 @@ public class ClientUI {
 	
 	private void printHelp() {
 		System.out.println("Please enter your file transfer request in the following format:\n");
-		System.out.println("<filename> <request type> <transfer mode>\n");
+		System.out.println("<filename> <request type> \n");
 		System.out.println("Acceptable request types: 'r' (read) or 'w' (write)");
-		System.out.println("Acceptable transfer modes: 'n' (netascii - text files) or 'o' (octet - binary files)");
 		System.out.println("Example request :\n");
-		System.out.println("file.txt r o\n");
+		System.out.println("file.txt r \n");
 		System.out.println("Press Q at any time to quit.\n");
 	}
 	
 	//Three different parameters expected
 	private void parseInput(String input) {
 		String[] args = input.split("\\s");
-		if (args.length < 3) {
+		if (args.length < 2) {
 			System.out.println("Not enough arguments.");
 			printHelp();
 			return;
@@ -114,21 +113,9 @@ public class ClientUI {
 		
 		String filename = args[0];
 		String type = args[1].toLowerCase();
-		String mode = args[2].toLowerCase();
-		
-		//Checks input of mode type
-		if (mode.equals("n")) {
-			mode = "netascii";
-		} else if (mode.equals("o")) {
-			mode = "octet";
-		} else {
-			System.out.println("Invalid transfer mode.");
-			printHelp();
-			return;
-		}
 		
 		client.setFilename(filename);
-		client.setMode(mode);
+		client.setMode("octet");
 		
 		client.retreiveFile();
 
