@@ -11,7 +11,9 @@ import java.net.UnknownHostException;
 import java.util.LinkedList;
 import java.util.Scanner;
 
+import tftp.net.PacketType;
 import tftp.net.PacketUtil;
+import tftp.net.ProcessType;
 import tftp.server.Server;
 
 /**
@@ -1038,7 +1040,7 @@ public class ErrorSimulator {
 
 					// listen for extra retransmit anyways
 					// set timeout on client receive socket  
-					ErrorSimUtil.setSocketTimeout(clientRecvSocket, 2*TIMEOUT_MS);
+					PacketUtil.setSocketTimeout(clientRecvSocket, 2*TIMEOUT_MS);
 
 					// listen to detect extra retransmits
 					System.out.println("\n\tListening for further retransmissions from client...");
@@ -1056,7 +1058,7 @@ public class ErrorSimulator {
 					}
 
 					// reset timeout to 0  
-					ErrorSimUtil.setSocketTimeout(clientRecvSocket, 0);
+					PacketUtil.setSocketTimeout(clientRecvSocket, 0);
 
 					// end simulation
 					printEndSimulation();
@@ -1165,7 +1167,7 @@ public class ErrorSimulator {
 				
 				// receive server DATA/ACK
 				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK");
-				currentBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
+				currentBlockNum = PacketUtil.getBlockNumber(receivePacket);
 				serverTID = receivePacket.getPort();
 				
 				if (receiverProcessSelection == ProcessType.CLIENT) {
@@ -1189,7 +1191,7 @@ public class ErrorSimulator {
 
 							// listen for extra retransmit anyways
 							// set timeout on client receive socket  
-							ErrorSimUtil.setSocketTimeout(serverSendRecvSocket, 2*TIMEOUT_MS);
+							PacketUtil.setSocketTimeout(serverSendRecvSocket, 2*TIMEOUT_MS);
 
 							// listen to detect extra retransmits
 							System.out.println("\n\tListening for further retransmissions from server...");
@@ -1207,7 +1209,7 @@ public class ErrorSimulator {
 							}
 
 							// reset timeout to 0  
-							ErrorSimUtil.setSocketTimeout(serverSendRecvSocket, 0);
+							PacketUtil.setSocketTimeout(serverSendRecvSocket, 0);
 
 							// end simulation
 							printEndSimulation();
@@ -1253,7 +1255,7 @@ public class ErrorSimulator {
 				
 				// get client response				
 				receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK");
-				currentBlockNum = ErrorSimUtil.getBlockNumber(receivePacket);
+				currentBlockNum = PacketUtil.getBlockNumber(receivePacket);
 				
 				// check if the packet should be dropped
 				if (receiverProcessSelection == ProcessType.SERVER) {
@@ -1276,7 +1278,7 @@ public class ErrorSimulator {
 
 							// listen for extra retransmit anyways
 							// set timeout on client receive socket  
-							ErrorSimUtil.setSocketTimeout(clientSendRecvSocket, 2*TIMEOUT_MS);
+							PacketUtil.setSocketTimeout(clientSendRecvSocket, 2*TIMEOUT_MS);
 
 							// listen to detect extra retransmits
 							System.out.println("\n\tListening for further retransmissions from client...");
@@ -1294,7 +1296,7 @@ public class ErrorSimulator {
 							}
 
 							// reset timeout to 0  
-							ErrorSimUtil.setSocketTimeout(clientSendRecvSocket, 0);
+							PacketUtil.setSocketTimeout(clientSendRecvSocket, 0);
 
 							// end simulation
 							printEndSimulation();
@@ -1732,17 +1734,17 @@ public class ErrorSimulator {
 			System.exit(1);
 		}	
 
-		receivedPacketType = ErrorSimUtil.getPacketType(receivePacket);		
+		receivedPacketType = PacketUtil.getPacketType(receivePacket);		
 		String label = receivedPacketType.name();
 
 		// if DATA or ACK packet, display block number		
 		if (receivedPacketType == PacketType.DATA || receivedPacketType == PacketType.ACK)
-			label += " " + ErrorSimUtil.getBlockNumber(receivePacket);
+			label += " " + PacketUtil.getBlockNumber(receivePacket);
 		else if (receivedPacketType == PacketType.ERROR)
-			label += " " + ErrorSimUtil.getErrorCode(receivePacket);
+			label += " " + PacketUtil.getErrorCode(receivePacket);
 
 		System.out.printf("received %s packet ", label);
-		ErrorSimUtil.printOpcode(receivePacket);
+		PacketUtil.printOpcodeAndLength(receivePacket);
 	}
 
 	/**
@@ -1773,17 +1775,17 @@ public class ErrorSimulator {
 			System.exit(1);
 		}	
 
-		receivedPacketType = ErrorSimUtil.getPacketType(receivePacket);		
+		receivedPacketType = PacketUtil.getPacketType(receivePacket);		
 		String label = receivedPacketType.name();
 
 		// if DATA or ACK packet, display block number		
 		if (receivedPacketType == PacketType.DATA || receivedPacketType == PacketType.ACK)
-			label += " " + ErrorSimUtil.getBlockNumber(receivePacket);
+			label += " " + PacketUtil.getBlockNumber(receivePacket);
 		else if (receivedPacketType == PacketType.ERROR)
-			label += " " + ErrorSimUtil.getErrorCode(receivePacket);
+			label += " " + PacketUtil.getErrorCode(receivePacket);
 
 		System.out.printf("received %s packet ", label);
-		ErrorSimUtil.printOpcode(receivePacket);
+		PacketUtil.printOpcodeAndLength(receivePacket);
 	}
 
 	/**
@@ -1807,16 +1809,16 @@ public class ErrorSimulator {
 			return;
 		}	
 
-		PacketType sendType = ErrorSimUtil.getPacketType(sendPacket);		
+		PacketType sendType = PacketUtil.getPacketType(sendPacket);		
 		String label = sendType.name();
 		// if DATA or ACK packet, display block number		
 		if (sendType == PacketType.DATA || sendType == PacketType.ACK)
-			label += " " + ErrorSimUtil.getBlockNumber(sendPacket);
+			label += " " + PacketUtil.getBlockNumber(sendPacket);
 		else if (sendType == PacketType.ERROR)
-			label += " " + ErrorSimUtil.getErrorCode(receivePacket);
+			label += " " + PacketUtil.getErrorCode(receivePacket);
 
 		System.out.printf("sent %s packet ", label);
-		ErrorSimUtil.printOpcode(sendPacket);
+		PacketUtil.printOpcodeAndLength(sendPacket);
 	}
 
 	/**
@@ -1833,11 +1835,11 @@ public class ErrorSimulator {
 		if (receivedPacketType == PacketType.ERROR) {
 
 			if (receivePacket.getData()[3] == expectedErrCode) {
-				String msg = ErrorSimUtil.getErrMessage(receivePacket.getData());
+				String msg = PacketUtil.getErrMessage(receivePacket.getData());
 				System.out.printf("%s responded with ERROR code %d as expected! [PASS]\n", srcProcName, expectedErrCode);
 				System.out.printf("error message from packet: \"%s\"\n", msg);
 			} else {
-				String msg = ErrorSimUtil.getErrMessage(receivePacket.getData());
+				String msg = PacketUtil.getErrMessage(receivePacket.getData());
 				System.out.printf("%s responded with ERROR code %d (not %d as expected) [FAIL]\n", 
 						srcProcName, receivePacket.getData()[3], expectedErrCode);
 				System.out.printf("error message from packet: \"%s\"\n", msg);
@@ -1948,7 +1950,7 @@ public class ErrorSimulator {
 	 */
 	private boolean isFinalDataPacket(DatagramPacket packet) {
 		// return false if not a DATA packet 
-		if (ErrorSimUtil.getPacketType(packet) != PacketType.DATA)
+		if (PacketUtil.getPacketType(packet) != PacketType.DATA)
 			return false;
 
 		// check length including opcode and block number
@@ -1963,7 +1965,7 @@ public class ErrorSimulator {
 	 */
 	private boolean isTerminatingErrorPacket(DatagramPacket packet) {
 		// return false if not an ERROR packet 
-		if (ErrorSimUtil.getPacketType(packet) != PacketType.ERROR)
+		if (PacketUtil.getPacketType(packet) != PacketType.ERROR)
 			return false;
 
 		byte errCode = packet.getData()[3];

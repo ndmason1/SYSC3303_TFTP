@@ -1,4 +1,4 @@
-package tftp.sim;
+package tftp.net;
 
 // TFTP packet types
 public enum PacketType {

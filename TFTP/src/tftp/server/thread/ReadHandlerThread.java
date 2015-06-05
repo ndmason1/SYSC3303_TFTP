@@ -10,12 +10,13 @@ package tftp.server.thread;
 
 import java.nio.file.*;
 import java.io.File;
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.nio.file.Paths;
 
 import tftp.exception.TFTPException;
+import tftp.net.OPcodeError;
 import tftp.net.PacketUtil;
+import tftp.net.ProcessType;
 import tftp.net.Sender;
 
 /**
@@ -55,40 +56,24 @@ public class ReadHandlerThread extends WorkerThread {
 			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 			// send error packet
 			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage());
-			try {			   
-				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {
-				printToConsole("IOException occured while attemping to send ERROR packet");
-				ex.printStackTrace();
-				cleanup();
-				return;
-			}
+			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, errPacket, ProcessType.CLIENT, "ERROR");
 			return;
 		}
 		
-
-	
 		//\\//\\//\\ File Not Found - Error Code 1 //\\//\\//\\
 
 		//Opens an input stream
 		File f = new File(getDirectory().concat("\\" + filename));
 		Path path = Paths.get(getDirectory().concat("\\" + filename));
-		System.out.println(getDirectory().concat("\\" + filename));
+		
 		if(!f.exists()){    //file doesn't exist
 
 			byte errorCode = PacketUtil.ERR_FILE_NOT_FOUND;   //error code 1 : file not found
 			DatagramPacket error= OPcodeError.OPerror("FILE NOT FOUND",errorCode);  //create error packet
 			error.setAddress(reqPacket.getAddress());
-			error.setPort(reqPacket.getPort());		
-
-			try {			   
-				sendReceiveSocket.send(error);
-			} catch (IOException ex) {
-				printToConsole("IOException occured while attemping to send ERROR packet");
-				ex.printStackTrace();
-				cleanup();
-				return;
-			}
+			error.setPort(reqPacket.getPort());
+			
+			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, error, ProcessType.CLIENT, "ERROR");
 			
 			cleanup();			   
 			return;
@@ -101,14 +86,7 @@ public class ReadHandlerThread extends WorkerThread {
 			error.setAddress(reqPacket.getAddress());
 			error.setPort(reqPacket.getPort());		
 
-			try {			   
-				sendReceiveSocket.send(error);			   
-			}  catch (IOException ex) {
-				printToConsole("IOException occured while attemping to send ERROR packet");
-				ex.printStackTrace();
-				cleanup();
-				return;
-			}
+			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, error, ProcessType.CLIENT, "ERROR");			
 			
 			cleanup();			   
 			return;
@@ -116,10 +94,10 @@ public class ReadHandlerThread extends WorkerThread {
 		
 		// request is good if we made it here
 		// read request, so start a file transfer
-		Sender s = new Sender(this, sendReceiveSocket, clientPort);
-		try {
-			printToConsole("Sender created");
+		Sender s = new Sender(this, ProcessType.CLIENT, sendReceiveSocket, clientPort);
+		try {			
 			s.sendFile(f);
+			printToConsole("Finished read request for file: " + f.getName());
 		} catch (TFTPException e) {
 			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 			if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID) {

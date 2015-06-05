@@ -9,13 +9,14 @@
 package tftp.server.thread;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.SocketTimeoutException;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
+import tftp.net.OPcodeError;
 import tftp.net.PacketUtil;
+import tftp.net.ProcessType;
 import tftp.net.Receiver;
 
 /**
@@ -44,9 +45,7 @@ public class WriteHandlerThread extends WorkerThread {
 	@Override
 
 	public void run() {		
-		
-		byte[] data = reqPacket.getData();
-		
+				
 		PacketUtil packetUtil = new PacketUtil(reqPacket.getAddress(), reqPacket.getPort());
 		String filename = null;
 		
@@ -65,34 +64,15 @@ public class WriteHandlerThread extends WorkerThread {
 			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 
 			// send error packet
-			DatagramPacket errPacket = null;
-			
-			if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-				// address packet to the unknown TID
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-						receivePacket.getAddress(), receivePacket.getPort());						
-			} else {
-				// packet will be addressed to recipient as usual					
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+			DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
 						receivePacket.getAddress(), receivePacket.getPort());
-			}
-			
-			try {			   
-				sendReceiveSocket.send(errPacket);			   
-			} catch (IOException ex) {			   
-				System.out.println("Error occured sending ERROR packet");
-				ex.printStackTrace();
-				cleanup();
-				return;
-			}
+			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, errPacket, ProcessType.CLIENT, "ERROR");
 			
 			printToConsole("request cannot be processed, ending this thread");			
 			return;
-		}	
-		
+		}			
 	
 		File f = new File(getDirectory().concat("\\" + filename));
-		System.out.println(getDirectory().concat("\\" + filename));
 		
 		if(f.exists() && !f.canWrite()){    // no write access
 
@@ -101,59 +81,42 @@ public class WriteHandlerThread extends WorkerThread {
 			error.setAddress(reqPacket.getAddress());
 			error.setPort(reqPacket.getPort());		
 
-			try {			   
-				sendReceiveSocket.send(error);			   
-			} catch (IOException ex) {			   
-				ex.printStackTrace();
-			}			   
+			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, error, ProcessType.CLIENT, "ERROR");			   
 			sendReceiveSocket.close();			   
 			return;
 		}
 
 		// request is good if we made it here
-		// write request, so send an ACK 0
-		
-		System.out.println("sending ACK 0");
+		// write request, so send an ACK 0		
 		DatagramPacket initAck = packetUtil.formAckPacket(0);
-		try {
-			sendReceiveSocket.send(initAck);
-		} 
-		catch (IOException e) {
-			printToConsole("Error occured sending ACK 0 packet");
-			e.printStackTrace();
-			cleanup();
-			return;
-		} 
-		
+		PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, initAck, ProcessType.CLIENT, "ACK");		
 		
 		// get the first data packet so we can set up receiver
-		data = new byte[PacketUtil.BUF_SIZE];
-		receivePacket = new DatagramPacket(data, data.length);
 		
-		boolean PacketReceived = false;
+		boolean packetReceived = false;
         int retransmission = 0;
         
-        while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){ 
+        while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){ 
         	try {
 		        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-		        	System.out.println("Can not complete sending Request, terminated");
+		        	printToConsole("Can not complete sending Request, terminated");
 		        	return;
 		        }
-        		sendReceiveSocket.receive(receivePacket);
-        		PacketReceived = true;
+		        
+		        receivePacket = PacketUtil.receivePacketOrTimeout(getName()+": ", sendReceiveSocket, ProcessType.CLIENT, "DATA");		        
+        		packetReceived = true;
         		retransmission++;
         	} catch (SocketTimeoutException socketTimeoutException) {
         		printToConsole("Error Socket Timeout occured retrieving DATA packet");
         		return;
-        	} catch (IOException e) {
-        		e.printStackTrace();
         	}
         }
+        
 		// set up receiver with request packet's port, as this is the client's TID
-		Receiver r = new Receiver(this, sendReceiveSocket, reqPacket.getPort());
+		Receiver r = new Receiver(this, ProcessType.CLIENT, sendReceiveSocket, reqPacket.getPort());
 		try {
-			printToConsole("calling receiver.receiveFile()");
 			r.receiveFile(receivePacket, f);
+			printToConsole("Finished write request for file: " + f.getName());
 		} catch (TFTPException e) {
 			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 		} finally {		
