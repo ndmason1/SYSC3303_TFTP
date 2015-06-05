@@ -103,6 +103,7 @@ public class Sender {
 	        	try {
 	        		reply = PacketUtil.receivePacketOrTimeout(threadLabel, socket, receiverProcess, "ACK");
 	        		packetReceived = true;
+	        		retransmission = 0;
 	        		
 	        	} catch (SocketTimeoutException ex){
 	        		//no response for last Data packet, Data packet maybe lost, resending...
