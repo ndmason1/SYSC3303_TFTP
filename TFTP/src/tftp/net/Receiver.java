@@ -40,15 +40,9 @@ public class Receiver
 	private ProcessType senderProcess; 			// process that is controlling the Sender to this Receiver
 	private String threadLabel = "";			// identify the owner thread when sending ACK
 
-	public Receiver(ProcessType senderProcess, DatagramSocket socket, int senderPort){		
-
-		try {
-			senderIP = InetAddress.getLocalHost();
-		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
+	public Receiver(ProcessType senderProcess, DatagramSocket socket,InetAddress ip, int senderPort){		
+	
+		senderIP = ip;
 		this.socket = socket;	
 		packetUtil = new PacketUtil(senderIP, senderPort);
 		packetParser = new PacketParser(senderIP, senderPort);
@@ -58,8 +52,8 @@ public class Receiver
 	}
 
 	// extra constructor to allow the Receiver to print messages in the context of a server thread
-	public Receiver(WorkerThread ownerThread, ProcessType senderProcess, DatagramSocket socket, int senderPort){
-		this(senderProcess, socket, senderPort);		
+	public Receiver(WorkerThread ownerThread, ProcessType senderProcess, DatagramSocket socket,InetAddress ip, int senderPort){
+		this(senderProcess, socket,ip, senderPort);		
 		this.ownerThread = ownerThread;
 		threadLabel = ownerThread.getName() + ": ";
 	}
