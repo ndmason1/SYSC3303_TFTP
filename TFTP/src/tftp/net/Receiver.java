@@ -22,7 +22,7 @@ import java.util.Arrays;
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
 import tftp.server.thread.WorkerThread;
-import tftp.sim.ErrorSimUtil;
+
 
 public class Receiver
 {    
@@ -32,14 +32,15 @@ public class Receiver
 
 	private InetAddress senderIP;
 	private PacketUtil packetUtil;
-	static String filename; 			//name of the file
 	private PacketParser packetParser;
 	private FileOutputStream fileWriter = null;
 	private byte[] data;
 
-	private WorkerThread ownerThread = null; // whatever server thread is using this object
+	private WorkerThread ownerThread = null;	// whatever server thread is using this object
+	private ProcessType senderProcess; 			// process that is controlling the Sender to this Receiver
+	private String threadLabel = "";			// identify the owner thread when sending ACK
 
-	public Receiver(DatagramSocket socket, int senderPort){		
+	public Receiver(ProcessType senderProcess, DatagramSocket socket, int senderPort){		
 
 		try {
 			senderIP = InetAddress.getLocalHost();
@@ -51,73 +52,36 @@ public class Receiver
 		this.socket = socket;	
 		packetUtil = new PacketUtil(senderIP, senderPort);
 		packetParser = new PacketParser(senderIP, senderPort);
+		
+		this.senderProcess = senderProcess;		
 
 	}
 
 	// extra constructor to allow the Receiver to print messages in the context of a server thread
-	public Receiver(WorkerThread ownerThread, DatagramSocket socket, int senderPort){
-		this(socket, senderPort);		
+	public Receiver(WorkerThread ownerThread, ProcessType senderProcess, DatagramSocket socket, int senderPort){
+		this(senderProcess, socket, senderPort);		
 		this.ownerThread = ownerThread;
+		threadLabel = ownerThread.getName() + ": ";
 	}
 
 	public void receiveFile(DatagramPacket initPacket, File aFile) throws TFTPException {
 
 		int blockNum = 1;
 		int oldBlockNum = 1;
-		int receivedBlockNum = 0;
 		boolean duplicatePacket = false;
-		
-		// parse the first DATA packet and see if we even need to continue
-		try {
-			printToConsole("RECEIVER: about to parse DATA packet, expected block number " + oldBlockNum);
-			packetParser.parseDataPacket(initPacket, oldBlockNum);
-
-		} catch (ErrorReceivedException e) {
-			// the other side sent an error packet, don't send a response
-			// rethrow so the owner of this Receiver knows whats up
-			throw e;
-
-		} catch (TFTPException e) {
-
-			// send error packet
-			DatagramPacket errPacket = null;
-
-
-			// packet will be addressed to recipient as usual					
-			errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-					initPacket.getAddress(), initPacket.getPort());	
-			
-
-
-			try {			   
-				socket.send(errPacket);			   
-			} catch (IOException ex) {			   
-				throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
-			}
-
-			// keep going if error was unknown TID
-			// otherwise, rethrow so the client UI can print a message
-			if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID)
-				throw e;
-		}
 		
 		createFile(aFile);
 		checkDiskFull(aFile, initPacket);
 		writeToFile(data, initPacket);
 		
-		// create recv packet
+		// recv packet, initialize buffer so clearing it doesn't fail
 		data = new byte[PacketUtil.BUF_SIZE];
-		DatagramPacket receivePacket = new DatagramPacket(data, data.length);
+		DatagramPacket receivePacket = null;
 
 		// send ACK for initial data packet
 		DatagramPacket sendPacket = packetUtil.formAckPacket(blockNum);
-
-		try {
-			socket.send(sendPacket);
-		} catch (IOException e) {
-			throw new TFTPException(e.getMessage(), PacketUtil.ERR_UNDEFINED);
-		}
-
+		PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, senderProcess, "ACK");
+		
 		// check if we are done
 		boolean done = initPacket.getLength() < 516;		
 
@@ -127,81 +91,53 @@ public class Receiver
 			oldBlockNum = blockNum;
 			blockNum++;
 
-			boolean PacketReceived = false;
+			boolean packetReceived = false;
 			int retransmission = 0;
 
-			while (!PacketReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
-				// wait for response
-				printToConsole("waiting for next DATA segment...");
+			while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
 				
 				// zero the receive buffer so no lingering data is detected
 				Arrays.fill(data, (byte)0);
-				receivePacket = new DatagramPacket(data, data.length);
 				
-				try {			  
-					socket.receive(receivePacket);
-					PacketReceived = true;					
+				try {
+					receivePacket = PacketUtil.receivePacketOrTimeout(threadLabel, socket, senderProcess, "DATA");
+					packetReceived = true;				
 					
 				} catch(SocketTimeoutException e){
 					
 					printToConsole("Error: Response data packet not received, last ack packet may lost, resending...");
-					try {
-						if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-							System.out.println("Can not complete tranfer file, terminated");
-							return;
-						}
-						if (!duplicatePacket) {
-							socket.send(sendPacket);
-							retransmission++;
-						}
-						
-					} catch (IOException ew) {
-						throw new TFTPException(ew.getMessage(), PacketUtil.ERR_UNDEFINED);
+					
+					if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+						System.out.println("Can not complete tranfer file, terminated");
+						return;
 					}
-
-				} catch(IOException ex) {
-					ex.printStackTrace();
-					System.exit(1);
-				} 
+					if (!duplicatePacket) {
+						PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, senderProcess, "ACK");
+						retransmission++;
+					} 
+				}
 			
 			}
-			
-			
-			receivedBlockNum = PacketUtil.getBlockNumber(receivePacket);
-
-			printToConsole(String.format("DATA %d received", receivedBlockNum));
-			
-			
 
 			// parse the response packet to ensure it is correct before continuing
 			try {
-				printToConsole("RECEIVER: about to parse DATA packet, expected block number " + blockNum);
 				duplicatePacket = packetParser.parseDataPacket(receivePacket, blockNum);
 
 			} catch (ErrorReceivedException e) {
 				// the other side sent an error packet, don't send a response
 				// rethrow so the owner of this Receiver knows whats up
-				printToConsole("ERROR packet received from sending side!");				
+				printToConsole(String.format("ERROR packet received from %s!", senderProcess.name().toLowerCase()));				
 				throw e;
 
 			} catch (TFTPException e) {
 
 				// send error packet
 				DatagramPacket errPacket = null;
-
-
-
-				// packet will be addressed to recipient as usual					
+				
 				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
 						receivePacket.getAddress(), receivePacket.getPort());
-				
 
-
-				try {			   
-					socket.send(errPacket);			   
-				} catch (IOException ex) {			   
-					throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
-				}
+				PacketUtil.sendPacketToProcess(threadLabel, socket, errPacket, senderProcess, "ERROR");
 				
 				// keep going if error was unknown TID
 				// otherwise, rethrow so the client UI can print a message
@@ -216,13 +152,10 @@ public class Receiver
 
 			// If duplicate data packet we will not write to file
 			if (duplicatePacket){
-				printToConsole("RECEIVER: DATA packet is duplicate, actual block number " 
-						+ receivedBlockNum);
-				blockNum = oldBlockNum;		
-			}
-			else{
-				printToConsole("RECEIVER: DATA packet is valid, actual block number " 
-						+ receivedBlockNum);
+				blockNum = oldBlockNum;
+				
+			} else {
+				
 				checkDiskFull(aFile, receivePacket); // First check if disk is full
 				writeToFile(data, receivePacket); 	 // If not write the data portion to the file
 				
@@ -230,25 +163,15 @@ public class Receiver
 					done = true;
 				}
 
-				// send ACK
-				//blockNum = packetUtil.parseDataPacket(receivePacket);
 			}
 			
-			// BlockNum is verified, sending old block num if duplication of packet occured
-			sendPacket = packetUtil.formAckPacket(blockNum);
-
-			printToConsole(String.format("sending ACK %d", blockNum));
-
-			try {
-				socket.send(sendPacket);
-				//
-			} catch (IOException ea) {
-				ea.printStackTrace();
-				System.exit(1);
-			}
+			// blockNum is verified, sending old block num if duplication of packet occured
+			sendPacket = packetUtil.formAckPacket(blockNum);			
+			PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, senderProcess, "ACK");
+			
 		}
+		
 		closeFileWriter(fileWriter);
-		printToConsole("*** finished transfer ***");
 	} 
 
 	private void closeFileWriter(FileOutputStream fileWriter) throws TFTPException {
@@ -307,11 +230,7 @@ public class Receiver
 			byte errorCode = 3;
 			DatagramPacket error = packetUtil.formErrorPacket(errorCode, "DISK FULL");	
 
-			try {			   
-				socket.send(error);			   
-			} catch (IOException ex) {			   
-				throw new TFTPException(ex.getMessage(), PacketUtil.ERR_UNDEFINED);
-			}	
+			PacketUtil.sendPacketToProcess(threadLabel, socket, error, senderProcess, "ERROR");
 				
 			throw new TFTPException(msg, PacketUtil.ERR_DISK_FULL);
 

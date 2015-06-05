@@ -1744,7 +1744,7 @@ public class ErrorSimulator {
 			label += " " + PacketUtil.getErrorCode(receivePacket);
 
 		System.out.printf("received %s packet ", label);
-		PacketUtil.printOpcode(receivePacket);
+		PacketUtil.printOpcodeAndLength(receivePacket);
 	}
 
 	/**
@@ -1785,7 +1785,7 @@ public class ErrorSimulator {
 			label += " " + PacketUtil.getErrorCode(receivePacket);
 
 		System.out.printf("received %s packet ", label);
-		PacketUtil.printOpcode(receivePacket);
+		PacketUtil.printOpcodeAndLength(receivePacket);
 	}
 
 	/**
@@ -1818,7 +1818,7 @@ public class ErrorSimulator {
 			label += " " + PacketUtil.getErrorCode(receivePacket);
 
 		System.out.printf("sent %s packet ", label);
-		PacketUtil.printOpcode(sendPacket);
+		PacketUtil.printOpcodeAndLength(sendPacket);
 	}
 
 	/**

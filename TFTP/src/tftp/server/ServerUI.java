@@ -9,11 +9,13 @@
 
 package tftp.server;
 
+import java.io.IOException;
 import java.util.Scanner;
 
 public class ServerUI {
 
-	private Scanner keyboard;	
+	private Scanner keyboard;
+	private ServerThread st;
 	
 	public ServerUI() {
 		keyboard = new Scanner(System.in);		
@@ -22,8 +24,11 @@ public class ServerUI {
 	public void showUI() {
 		System.out.println("TFTP server running [v1.0 - LOCALHOST ONLY] (press Q to terminate) ");		
 		
-		ServerThread st = new ServerThread();
-		st.start();
+		st = new ServerThread();
+		
+		promptDirectory();
+		
+		st.start();		
 		System.out.println("Waiting for requests...");
 		
 		String input = keyboard.nextLine();
@@ -35,6 +40,39 @@ public class ServerUI {
 				st.shutdown();
 			}
 		
+	}
+	
+	private void promptDirectory() {
+		boolean check = true; 
+		Server server = st.getServer();
+		
+		while (check){
+			System.out.println("Do you wish to use the default server directory path? y/n?");
+			String diskFullPath = keyboard.nextLine();
+		
+			if (diskFullPath.toLowerCase().equals("yes") || diskFullPath.toLowerCase().equals("y"))
+			{
+				try {
+					server.setDirectory(new java.io.File(".").getCanonicalPath().concat(new String("\\src\\tftp\\server\\ServerFiles")));
+					System.out.println("Using default server directory!");
+				} catch (IOException e) {			
+					System.out.println("Couldn't set up directory for client files! terminating");
+					e.printStackTrace();
+					server.cleanup();
+					System.exit(1);
+				}
+				check = false;
+			}
+			if (diskFullPath.toLowerCase().equals("no") || diskFullPath.toLowerCase().equals("n"))
+			{
+				System.out.println("Please enter in a valid target directory path: ");
+				diskFullPath = keyboard.nextLine();
+				//TODO check valid directory path
+				server.setDirectory(diskFullPath);
+				check = false;
+				System.out.println("Successfully changed server directory!");
+			}
+		}
 	}
 	
 	public static void main(String args[]) {
@@ -62,6 +100,8 @@ public class ServerUI {
 		public void shutdown() {
 			server.finishProcessing();
 		}
+		
+		public Server getServer() { return server; }
 	}
 
 }
