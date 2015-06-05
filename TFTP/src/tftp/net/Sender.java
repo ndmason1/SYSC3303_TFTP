@@ -25,7 +25,7 @@ import tftp.server.thread.WorkerThread;
 
 public class Sender {
 	
-	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
+	private final static int DEFAULT_RETRY_TRANSMISSION = 3;
 
 	private FileInputStream fileReader;
 	private DatagramSocket socket;
@@ -109,6 +109,7 @@ public class Sender {
 	        		printToConsole("Error: Timed out retreiving ACK Packet, Possible data packet loss, resending...");
 	    			
     				if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+    					
     					System.out.println("Can not complete sending Request, terminated");
     					return;
     				}
