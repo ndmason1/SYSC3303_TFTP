@@ -9,6 +9,7 @@
 
 package tftp.server;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Scanner;
 
@@ -65,12 +66,20 @@ public class ServerUI {
 			}
 			if (diskFullPath.toLowerCase().equals("no") || diskFullPath.toLowerCase().equals("n"))
 			{
-				System.out.println("Please enter in a valid target directory path: ");
-				diskFullPath = keyboard.nextLine();
-				//TODO check valid directory path
-				server.setDirectory(diskFullPath);
-				check = false;
-				System.out.println("Successfully changed server directory!");
+				while(true){
+					System.out.println("Please enter in a valid target directory path: ");
+					diskFullPath = keyboard.nextLine();
+					//TODO check valid directory path
+					File file = new File(diskFullPath);
+					if (file.isDirectory()){
+						server.setDirectory(diskFullPath);
+						check = false;
+						System.out.println("Successfully changed server directory!");
+						break;
+					}
+					System.out.println("Invalide directory path, please enter again!");
+				}
+				
 			}
 		}
 	}

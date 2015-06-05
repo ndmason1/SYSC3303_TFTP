@@ -102,12 +102,13 @@ public class PacketParser {
 		byte[] data = packet.getData();
 		
 		// the packet could be an error packet, so check this first
+		
 		if (data[1] == PacketUtil.ERROR_FLAG)
 			parseErrorPacket(packet);
 		
+
 		// check TID
 		checkTID(packet);
-
 		// check opcode
 		if (data[0] != 0 || data[1] != PacketUtil.DATA_FLAG)
 			throw new TFTPException("bad op code, expected DATA", PacketUtil.ERR_ILLEGAL_OP);

@@ -8,7 +8,10 @@
 
 package tftp.client;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Scanner;
 
 import tftp.exception.ErrorReceivedException;
@@ -29,6 +32,20 @@ public class ClientUI {
 	
 	public void showUI() {		
 		System.out.println("\nWelcome to the TFTP client. [v1.1 - LOCALHOST ONLY]");
+		
+		
+		System.out.println("Please Enter a valid Server IP address:");
+		String IPaddress = keyboard.nextLine();
+		
+		try {
+			client.setIP(InetAddress.getByName(IPaddress));
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			System.out.println("Can not set IP address, terminated");
+			return;
+		}
+		
+		
 		
 		boolean check = true;
 		
@@ -68,11 +85,18 @@ public class ClientUI {
 			}
 			if (diskFullPath.toLowerCase().equals("no") || diskFullPath.toLowerCase().equals("n"))
 			{
-				System.out.println("Please enter in a valid target directory path: ");
-				diskFullPath = keyboard.nextLine();
-				//TODO check valid directory path
-				client.setDirectory(diskFullPath);
-				check = false;
+				while(true){
+					System.out.println("Please enter in a valid target directory path: ");
+					diskFullPath = keyboard.nextLine();
+					//TODO check valid directory path
+					File file = new File(diskFullPath);
+					if (file.isDirectory()){
+						client.setDirectory(diskFullPath);
+						check = false;
+						break;
+					}
+					System.out.println("Invalide directory path, please enter again!");
+				}
 			}
 		}
 		

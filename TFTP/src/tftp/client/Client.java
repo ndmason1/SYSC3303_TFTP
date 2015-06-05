@@ -111,7 +111,7 @@ public class Client {
 			//Checking if user can read the file
 			Path path = Paths.get(directory + "\\" + filename);
 			if (!Files.isWritable(path)){
-				String msg = "Do not have write permission of destination file";
+				String msg = "ACCESS VIOLATION:\n !!! No Write Permission of Client side File(" + filename +") !!!";
 				throw new TFTPException(msg, PacketUtil.ERR_ACCESS_VIOLATION);
 			}
 
@@ -124,15 +124,15 @@ public class Client {
 
 		//Checking if the file exists
 		if (!getFile().exists()){
-			String msg = "source file not found: " + getDirectory();
-			System.out.println(msg);
+			String msg = "CLIENT: FILE NOT FOUND(" + filename +") IN THE DIRECTORY\n" + getDirectory();
+			
 			throw new TFTPException(msg, PacketUtil.ERR_FILE_NOT_FOUND);
 
 		}
 	
 		Path path = Paths.get(directory + "\\" + filename);
 		if (!Files.isReadable(path)){			
-			throw new TFTPException("Do not have read permission from source file", PacketUtil.ERR_ACCESS_VIOLATION);
+			throw new TFTPException("ACCESS VIOLATION:\n !!! No Read Permission of Client side File(" + filename +") !!!", PacketUtil.ERR_ACCESS_VIOLATION);
 		}
 		if (getFile().length() > 33553920L){
 			throw new TFTPException("source file is too big! (files >  33MB not supported)", PacketUtil.ERR_UNDEFINED);
@@ -162,7 +162,7 @@ public class Client {
         		//no response received after 1 sec, resending
         		// TODO  how to resend twice if no response again
     			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-    				throw new TFTPException("maximum number of retransmissions reached, aborting operation", PacketUtil.ERR_UNDEFINED);
+    				throw new TFTPException("Server does not respond, maximum number of retransmissions reached, aborting operation", PacketUtil.ERR_UNDEFINED);
     			}
     			System.out.println("Socket Timeout for response of request packet, resending...");
     			
@@ -171,7 +171,7 @@ public class Client {
         	} 
 		}
         
-       
+        
 		PacketParser parser = new PacketParser(targetIP, receivePacket.getPort());
 		
 		try {
@@ -194,7 +194,7 @@ public class Client {
 			// rethrow so the client UI can print a message
 			throw e;
 		}
-
+		
 		// request is good, set up a receiver to proceed with the transfer
 		Receiver r = new Receiver(ProcessType.SERVER, sendReceiveSocket, receivePacket.getPort());
 		r.receiveFile(receivePacket, getFile());
@@ -223,10 +223,9 @@ public class Client {
         		//no response received after 1 sec, resending
         		// TODO  how to resend twice if no response again
         		
-    			if (retransmission == 2){
-    				System.out.println("Can not complete sending Request, teminated");
-    				cleanup();
-    				return;
+    			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+    				throw new TFTPException("Server does not respond, maximum number of retransmissions reached, aborting operation", PacketUtil.ERR_UNDEFINED);
+    				
     			}
 
     			System.out.println("Socket Timeout for response of request packet, resending...");
@@ -236,10 +235,6 @@ public class Client {
         	}
 		}
         
-        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-        	System.out.println("Can not complete sending Request, terminated");
-        	return;
-        }
         
 		PacketParser parser = new PacketParser(receivePacket.getAddress(), receivePacket.getPort());
 
@@ -289,6 +284,8 @@ public class Client {
 	public void setMode(String aMode){mode = aMode;}
 	public void setFile(File aFile){theFile = aFile;}
 
+	//set server ip function
+	public void setIP(InetAddress ip){targetIP = ip;}
 }
 
 

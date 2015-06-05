@@ -73,7 +73,7 @@ public class Server {
 			} catch (SocketException e) { 
 				// likely the socket was closed because the server is shutting down
 				System.out.printf("Stopped listening on port %d.\n", SERVER_PORT);
-				
+				return;
 			} catch (IOException e) {
 				System.out.println("IOexception listening for packets in main server thread");
 				e.printStackTrace();

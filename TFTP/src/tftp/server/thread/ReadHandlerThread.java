@@ -69,7 +69,8 @@ public class ReadHandlerThread extends WorkerThread {
 		if(!f.exists()){    //file doesn't exist
 
 			byte errorCode = PacketUtil.ERR_FILE_NOT_FOUND;   //error code 1 : file not found
-			DatagramPacket error= OPcodeError.OPerror("FILE NOT FOUND",errorCode);  //create error packet
+			DatagramPacket error= OPcodeError.OPerror("SERVER: FILE NOT FOUND (" + filename + ")",errorCode);  //create error packet
+		System.out.println(getDirectory());
 			error.setAddress(reqPacket.getAddress());
 			error.setPort(reqPacket.getPort());
 			

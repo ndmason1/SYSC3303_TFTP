@@ -77,7 +77,7 @@ public class WriteHandlerThread extends WorkerThread {
 		if(f.exists() && !f.canWrite()){    // no write access
 
 			byte errorCode = 2;   //error code 2 : access violation
-			DatagramPacket error = OPcodeError.OPerror("ACCESS VIOLATION",errorCode);  //create error packet
+			DatagramPacket error = OPcodeError.OPerror(new String("ACCESS VIOLATION: No Write Permission of Server side File(" + filename +")"),errorCode);  //create error packet
 			error.setAddress(reqPacket.getAddress());
 			error.setPort(reqPacket.getPort());		
 
