@@ -37,7 +37,8 @@ public class Sender {
 	private WorkerThread ownerThread = null;	// whatever server thread is using this object
 	private ProcessType receiverProcess; 		// process that is controlling the Receiver to this Sender 
 	private String threadLabel = "";			// identify the owner thread when sending ACK
-
+	private Boolean duplicatePacket = false;
+	
 	public Sender(ProcessType receiverProcess, DatagramSocket socket, int receiverPort){
 
 		try {
@@ -69,29 +70,32 @@ public class Sender {
 		}		
 		
 		int blockNum = 1;
-
 		byte[] sendBuf = new byte[512]; // need to make this exactly our block size so we only read that much
-
+		DatagramPacket sendPacket = null;
+		
 		boolean done = false;
 		do		
 		{
 			// zero the send buffer so no lingering data is sent
 			Arrays.fill(sendBuf, (byte)0);
-			try {
-				bytesRead = fileReader.read(sendBuf);
-			} catch (IOException e) {
-				throw new TFTPException("Error reading data from file: "+e.getMessage(), PacketUtil.ERR_UNDEFINED);
-			}
-			if (bytesRead == -1) {
-				bytesRead = 0;				
-			}
-			if (bytesRead < 512) {
-				done = true;
-			}
 			
-			// send DATA
-			DatagramPacket sendPacket = packetUtil.formDataPacket(sendBuf, bytesRead, blockNum);
-			PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, receiverProcess, "DATA");
+			// if last ACK packet was a duplicate we don't read from file
+			if (!duplicatePacket){
+				try {
+					bytesRead = fileReader.read(sendBuf);
+				} catch (IOException e) {
+					throw new TFTPException("Error reading data from file: "+e.getMessage(), PacketUtil.ERR_UNDEFINED);
+				}
+				if (bytesRead == -1) {
+					bytesRead = 0;				
+				}
+				if (bytesRead < 512) {
+					done = true;
+				}
+				// send DATA
+				sendPacket = packetUtil.formDataPacket(sendBuf, bytesRead, blockNum);
+				PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, receiverProcess, "DATA");
+			}
 			
 			DatagramPacket reply = null;
 	        
@@ -114,14 +118,17 @@ public class Sender {
     					System.out.println("Can not complete sending Request, terminated");
     					return;
     				}
-    				PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, receiverProcess, "DATA");
-    				retransmission++;
+    				System.out.println(sendPacket);
+    				if (!duplicatePacket){
+    					PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, receiverProcess, "DATA");
+    				}
+					retransmission++;
 	        	}   
 	        }
 	        
 			// parse ACK to ensure it is correct before continuing
 			try {
-				parser.parseAckPacket(reply, blockNum);
+				duplicatePacket = parser.parseAckPacket(reply, blockNum);
 			} catch (ErrorReceivedException e) {
 				// the other side sent an error packet, don't send a response				
 				// rethrow so the owner of this Sender knows whats up
@@ -144,7 +151,8 @@ public class Sender {
 				// rethrow so the owner of this Sender knows whats up
 				throw e;
 			}
-			blockNum++;
+			
+			if (!duplicatePacket) { blockNum++; }
 
 		} while (!done);
 		

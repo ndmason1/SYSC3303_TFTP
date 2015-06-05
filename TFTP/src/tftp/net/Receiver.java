@@ -104,6 +104,7 @@ public class Receiver
 					packetReceived = true;				
 					retransmission = 0;
 					
+					
 				} catch(SocketTimeoutException e){
 					
 					printToConsole("Error: Response data packet not received, last ack packet may lost, resending...");
