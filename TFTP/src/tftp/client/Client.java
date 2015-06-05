@@ -196,7 +196,7 @@ public class Client {
 		}
 		
 		// request is good, set up a receiver to proceed with the transfer
-		Receiver r = new Receiver(ProcessType.SERVER, sendReceiveSocket, receivePacket.getPort());
+		Receiver r = new Receiver(ProcessType.SERVER, sendReceiveSocket,targetIP, receivePacket.getPort());
 		r.receiveFile(receivePacket, getFile());
 	}
 
@@ -261,7 +261,7 @@ public class Client {
 
 		// set up a sender to proceed with the transfer
 
-		Sender s = new Sender(ProcessType.SERVER, sendReceiveSocket, receivePacket.getPort());
+		Sender s = new Sender(ProcessType.SERVER, sendReceiveSocket,receivePacket.getAddress(), receivePacket.getPort());
 		try {
 			s.sendFile(getFile());
 		} catch (TFTPException e) {

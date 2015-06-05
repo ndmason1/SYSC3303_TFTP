@@ -95,7 +95,7 @@ public class ReadHandlerThread extends WorkerThread {
 		
 		// request is good if we made it here
 		// read request, so start a file transfer
-		Sender s = new Sender(this, ProcessType.CLIENT, sendReceiveSocket, clientPort);
+		Sender s = new Sender(this, ProcessType.CLIENT, sendReceiveSocket,clientIP, clientPort);
 		try {			
 			s.sendFile(f);
 			printToConsole("Finished read request for file: " + f.getName());

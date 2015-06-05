@@ -26,7 +26,7 @@ import tftp.server.Server;
  */
 public class ErrorSimulator {
 
-	public static final int TIMEOUT_MS = 2000; // temporary constant to use to detect timeout
+	public static final int TIMEOUT_MS = 10000; // temporary constant to use to detect timeout
 
 	public static final int LISTEN_PORT = 78; // not using 68 due to its usage by windows DHCP service	
 
@@ -66,7 +66,7 @@ public class ErrorSimulator {
 			e.printStackTrace();
 			System.exit(1);
 		}
-
+		keyboard = new Scanner(System.in);
 		System.out.println("Please Enter a valid Server IP address:");
 		String IPaddress = keyboard.nextLine();
 		
@@ -80,7 +80,7 @@ public class ErrorSimulator {
 		
 
 
-		keyboard = new Scanner(System.in);
+		
 
 		System.out.println("==== TFTP ERROR SIMULATOR STARTED ====\n");
 
