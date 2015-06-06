@@ -158,6 +158,8 @@ public class Client {
         	try {			  
         		receivePacket = PacketUtil.receivePacketOrTimeout("", sendReceiveSocket, ProcessType.SERVER, "DATA");
         		packetReceived = true;
+        		retransmission = 0;
+        		
         	} catch(SocketTimeoutException ex){
         		//no response received after 1 sec, resending
         		// TODO  how to resend twice if no response again
@@ -219,6 +221,8 @@ public class Client {
         	try {			  
         		receivePacket = PacketUtil.receivePacketOrTimeout("", sendReceiveSocket, ProcessType.SERVER, "ACK");
         		packetReceived = true;
+        		retransmission = 0;
+        		
         	} catch(SocketTimeoutException ex){
         		//no response received after 1 sec, resending
         		// TODO  how to resend twice if no response again
@@ -283,6 +287,7 @@ public class Client {
 	public File getFile(){return theFile;}
 
 	//Client set functions
+	
 	public void setFilename(String aFilename){filename = aFilename;}
 	public void setDirectory(String aDirectory){directory = aDirectory;}
 	public void setPortNum(int aPort){targetPort = aPort;}

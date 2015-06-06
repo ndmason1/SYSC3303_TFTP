@@ -102,6 +102,8 @@ public class Receiver
 				try {
 					receivePacket = PacketUtil.receivePacketOrTimeout(threadLabel, socket, senderProcess, "DATA");
 					packetReceived = true;				
+					retransmission = 0;
+					
 					
 				} catch(SocketTimeoutException e){
 					

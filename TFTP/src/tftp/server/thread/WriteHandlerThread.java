@@ -105,9 +105,12 @@ public class WriteHandlerThread extends WorkerThread {
 		        
 		        receivePacket = PacketUtil.receivePacketOrTimeout(getName()+": ", sendReceiveSocket, ProcessType.CLIENT, "DATA");		        
         		packetReceived = true;
-        		retransmission++;
+        		retransmission = 0;
+        		
         	} catch (SocketTimeoutException socketTimeoutException) {
         		printToConsole("Error Socket Timeout occured retrieving DATA packet");
+        		PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, initAck, ProcessType.CLIENT, "ACK");
+        		retransmission++;
         		return;
         	}
         }
