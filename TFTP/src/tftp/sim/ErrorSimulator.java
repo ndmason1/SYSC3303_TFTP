@@ -66,15 +66,21 @@ public class ErrorSimulator {
 			e.printStackTrace();
 			System.exit(1);
 		}
-
-		try {
-			serverIP = InetAddress.getLocalHost(); // THIS WILL CHANGE IN ITERATION 5
-		} catch (UnknownHostException e) {
-			e.printStackTrace();
-			System.exit(1);
-		}
-
 		keyboard = new Scanner(System.in);
+		System.out.println("Please Enter a valid Server IP address:");
+		String IPaddress = keyboard.nextLine();
+		
+		try {
+			serverIP = InetAddress.getByName(IPaddress);
+		} catch (UnknownHostException e) {
+			// TODO Auto-generated catch block
+			System.out.println("Can not set IP address, terminated");
+			return;
+		}
+		
+
+
+		
 
 		System.out.println("==== TFTP ERROR SIMULATOR STARTED ====\n");
 
@@ -188,7 +194,7 @@ public class ErrorSimulator {
 		default:
 			break;
 		}
-	}
+	} 
 
 	/**
 	 * Displays a menu for the user to select a type of packet that should be modified.

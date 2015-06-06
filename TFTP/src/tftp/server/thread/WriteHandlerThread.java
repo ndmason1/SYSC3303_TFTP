@@ -77,7 +77,7 @@ public class WriteHandlerThread extends WorkerThread {
 		if(f.exists() && !f.canWrite()){    // no write access
 
 			byte errorCode = 2;   //error code 2 : access violation
-			DatagramPacket error = OPcodeError.OPerror("ACCESS VIOLATION",errorCode);  //create error packet
+			DatagramPacket error = OPcodeError.OPerror(new String("ACCESS VIOLATION: No Write Permission of Server side File(" + filename +")"),errorCode);  //create error packet
 			error.setAddress(reqPacket.getAddress());
 			error.setPort(reqPacket.getPort());		
 
@@ -116,7 +116,7 @@ public class WriteHandlerThread extends WorkerThread {
         }
         
 		// set up receiver with request packet's port, as this is the client's TID
-		Receiver r = new Receiver(this, ProcessType.CLIENT, sendReceiveSocket, reqPacket.getPort());
+		Receiver r = new Receiver(this, ProcessType.CLIENT, sendReceiveSocket,reqPacket.getAddress(), reqPacket.getPort());
 		try {
 			r.receiveFile(receivePacket, f);
 			printToConsole("Finished write request for file: " + f.getName());

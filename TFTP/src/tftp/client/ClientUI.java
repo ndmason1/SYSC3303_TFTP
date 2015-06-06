@@ -8,7 +8,10 @@
 
 package tftp.client;
 
+import java.io.File;
 import java.io.IOException;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.Scanner;
 
 import tftp.exception.ErrorReceivedException;
@@ -29,15 +32,24 @@ public class ClientUI {
 	
 	public void showUI() {		
 		System.out.println("\nWelcome to the TFTP client. [v1.1 - LOCALHOST ONLY]");
-		
+				
 		boolean check = true;
-		
+		//if user choose no error simulatoe, we need set it equal to 1
+		//and ask user input ip address in client
+		int needIP = 0;
 		while (check){
 			System.out.println("Error Simulator on? y/n?");
 			String errorSimulator = keyboard.nextLine();
 		
 			if (errorSimulator.toLowerCase().equals("yes") || errorSimulator.toLowerCase().equals("y"))
 			{
+				try {
+					client.setIP(InetAddress.getLocalHost());
+				} catch (UnknownHostException e) {
+					// TODO Auto-generated catch block
+					System.out.println("Can not set IP address, terminated");
+					return;
+				}
 				client.setPortNum(ErrorSimulator.LISTEN_PORT);
 				check = false;
 			}
@@ -45,9 +57,22 @@ public class ClientUI {
 			{
 				client.setPortNum(Server.SERVER_PORT);
 				check = false;
+				needIP = 1;
 			}
 		}
-		
+		if(needIP == 1){
+
+			System.out.println("Please Enter a valid Server IP address:");
+			String IPaddress = keyboard.nextLine();
+
+			try {
+				client.setIP(InetAddress.getByName(IPaddress));
+			} catch (UnknownHostException e) {
+				// TODO Auto-generated catch block
+				System.out.println("Can not set IP address, terminated");
+				return;
+			}
+		}
 		check = true; 
 		
 		while (check){
@@ -68,11 +93,18 @@ public class ClientUI {
 			}
 			if (diskFullPath.toLowerCase().equals("no") || diskFullPath.toLowerCase().equals("n"))
 			{
-				System.out.println("Please enter in a valid target directory path: ");
-				diskFullPath = keyboard.nextLine();
-				//TODO check valid directory path
-				client.setDirectory(diskFullPath);
-				check = false;
+				while(true){
+					System.out.println("Please enter in a valid target directory path: ");
+					diskFullPath = keyboard.nextLine();
+					//TODO check valid directory path
+					File file = new File(diskFullPath);
+					if (file.isDirectory()){
+						client.setDirectory(diskFullPath);
+						check = false;
+						break;
+					}
+					System.out.println("Invalide directory path, please enter again!");
+				}
 			}
 		}
 		

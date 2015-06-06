@@ -39,14 +39,8 @@ public class Sender {
 	private String threadLabel = "";			// identify the owner thread when sending ACK
 	private Boolean duplicatePacket = false;
 	
-	public Sender(ProcessType receiverProcess, DatagramSocket socket, int receiverPort){
-
-		try {
-			receiverIP = InetAddress.getLocalHost();
-		} catch (UnknownHostException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+	public Sender(ProcessType receiverProcess, DatagramSocket socket,InetAddress ip, int receiverPort){
+		receiverIP = ip;
 		this.socket = socket;		
 		packetUtil = new PacketUtil(receiverIP, receiverPort);
 		parser = new PacketParser(receiverIP, receiverPort);
@@ -55,8 +49,8 @@ public class Sender {
 	}
 	
 	// extra constructor to allow the Receiver to print messages in the context of a server thread
-	public Sender(WorkerThread ownerThread, ProcessType receiverProcess, DatagramSocket socket, int senderPort){
-		this(receiverProcess, socket, senderPort);		
+	public Sender(WorkerThread ownerThread, ProcessType receiverProcess, DatagramSocket socket,InetAddress ip, int senderPort){
+		this(receiverProcess, socket,ip, senderPort);		
 		this.ownerThread = ownerThread;
 		threadLabel = ownerThread.getName() + ": ";
 	}

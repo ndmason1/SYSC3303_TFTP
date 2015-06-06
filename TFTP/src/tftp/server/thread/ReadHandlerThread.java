@@ -69,7 +69,8 @@ public class ReadHandlerThread extends WorkerThread {
 		if(!f.exists()){    //file doesn't exist
 
 			byte errorCode = PacketUtil.ERR_FILE_NOT_FOUND;   //error code 1 : file not found
-			DatagramPacket error= OPcodeError.OPerror("FILE NOT FOUND",errorCode);  //create error packet
+			DatagramPacket error= OPcodeError.OPerror("SERVER: FILE NOT FOUND (" + filename + ")",errorCode);  //create error packet
+		System.out.println(getDirectory());
 			error.setAddress(reqPacket.getAddress());
 			error.setPort(reqPacket.getPort());
 			
@@ -94,7 +95,7 @@ public class ReadHandlerThread extends WorkerThread {
 		
 		// request is good if we made it here
 		// read request, so start a file transfer
-		Sender s = new Sender(this, ProcessType.CLIENT, sendReceiveSocket, clientPort);
+		Sender s = new Sender(this, ProcessType.CLIENT, sendReceiveSocket,clientIP, clientPort);
 		try {			
 			s.sendFile(f);
 			printToConsole("Finished read request for file: " + f.getName());
