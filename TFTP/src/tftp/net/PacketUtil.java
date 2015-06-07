@@ -140,7 +140,7 @@ public class PacketUtil {
 	public static void sendPacketToProcess(String senderLabel, DatagramSocket sendSocket, DatagramPacket sendPacket, 
 			ProcessType recvProcess, String sendPacketStr) {		
 				
-		System.out.printf("%ssending %s packet to %s (IP: %s, port %d) ... ", 
+		System.out.printf("%ssending %s packet to %s (IP: %s, port %d) ... \n", 
 				senderLabel, sendPacketStr, recvProcess, sendPacket.getAddress(), sendPacket.getPort());		
 		
 		try {
@@ -160,7 +160,7 @@ public class PacketUtil {
 		else if (sendType == PacketType.ERROR)
 			packetLabel += " " + getErrorCode(sendPacket);
 		
-		System.out.printf("\n%s  sent %s packet ", senderLabel, packetLabel);
+		System.out.printf("%s  sent %s packet ", senderLabel, packetLabel);
 		printOpcodeAndLength(sendPacket);
 	}
 	
@@ -181,7 +181,7 @@ public class PacketUtil {
 		DatagramPacket receivePacket = new DatagramPacket(data, data.length);
 		
 		// listen for a packet from given source process
-		System.out.printf("%slistening on port %s for %s packet from %s ... ", receiverLabel, recvSocket.getLocalPort(), 
+		System.out.printf("%slistening on port %s for %s packet from %s ... \n", receiverLabel, recvSocket.getLocalPort(), 
 				expectedPacketStr, sendProcess);
 		try {
 			recvSocket.receive(receivePacket);
@@ -203,7 +203,7 @@ public class PacketUtil {
 		else if (receivedPacketType == PacketType.ERROR)
 			packetLabel += " " + getErrorCode(receivePacket);
 		
-		System.out.printf("\n%s  received %s packet ", receiverLabel, packetLabel);
+		System.out.printf("%s  received %s packet ", receiverLabel, packetLabel);
 		printOpcodeAndLength(receivePacket);
 		
 		return receivePacket;
@@ -226,7 +226,7 @@ public class PacketUtil {
 		DatagramPacket receivePacket = new DatagramPacket(data, data.length);
 		
 		// listen for a packet from given source process
-		System.out.printf("%slistening on port %s for %s packet from %s ... ", receiverLabel, recvSocket.getLocalPort(), 
+		System.out.printf("%slistening on port %s for %s packet from %s ... \n", receiverLabel, recvSocket.getLocalPort(), 
 				expectedPacketStr, sendProcess);
 		try {
 			recvSocket.receive(receivePacket);
@@ -246,7 +246,7 @@ public class PacketUtil {
 		else if (receivedPacketType == PacketType.ERROR)
 			packetLabel += " " + getErrorCode(receivePacket);
 
-		System.out.printf("\n%s  received %s packet ", receiverLabel, packetLabel);
+		System.out.printf("%s  received %s packet ", receiverLabel, packetLabel);
 		printOpcodeAndLength(receivePacket);
 		
 		return receivePacket;

@@ -54,7 +54,7 @@ public class WriteHandlerThread extends WorkerThread {
 			filename = packetParser.parseWRQPacket(reqPacket);
 			
 		} catch (ErrorReceivedException e) {
-			// the other side sent an error pack``````````````` (%d) %s\n", e.getErrorCode(), e.getMessage()));			
+			// the other side sent an error packet, don't send response			
 			printToConsole("ERROR packet received from client!");
 			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 			return;
@@ -93,26 +93,60 @@ public class WriteHandlerThread extends WorkerThread {
 		
 		// get the first data packet so we can set up receiver
 		
-		boolean packetReceived = false;
-        int retransmission = 0;
-        
-        while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){ 
-        	try {
-		        if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-		        	printToConsole("Can not complete sending Request, terminated");
-		        	return;
-		        }
-		        
-		        receivePacket = PacketUtil.receivePacketOrTimeout(getName()+": ", sendReceiveSocket, ProcessType.CLIENT, "DATA");		        
-        		packetReceived = true;
-        		retransmission = 0;
-        		
-        	} catch (SocketTimeoutException socketTimeoutException) {
-        		printToConsole("Error Socket Timeout occured retrieving DATA packet");
-        		PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, initAck, ProcessType.CLIENT, "ACK");
-        		retransmission++;
-        		return;
+		boolean correctData = false;
+        while (!correctData) {
+
+        	boolean packetReceived = false;
+        	int retransmission = 0;
+
+        	while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){ 
+        		try {
+        			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+        				printToConsole("Can not complete sending Request, terminated");
+        				return;
+        			}
+
+        			receivePacket = PacketUtil.receivePacketOrTimeout(getName()+": ", sendReceiveSocket, ProcessType.CLIENT, "DATA");		        
+        			packetReceived = true;
+        			retransmission = 0;
+
+        		} catch (SocketTimeoutException socketTimeoutException) {
+        			printToConsole("Error Socket Timeout occured retrieving DATA packet");
+        			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, initAck, ProcessType.CLIENT, "ACK");
+        			retransmission++;
+        			return;
+        		}
         	}
+        
+	        // parse the first DATA packet to ensure it is correct before continuing
+	        try {
+	        	packetParser.parseDataPacket(receivePacket, 1);
+	
+	        } catch (ErrorReceivedException e) {
+	        	// the other side sent an error packet, don't send a response        	
+	        	printToConsole("ERROR packet received from client!");		
+	        	printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
+				return;        	
+	
+	        } catch (TFTPException e) {
+	
+	        	printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
+	        	
+	        	// send error packet
+	        	DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+	        			receivePacket.getAddress(), receivePacket.getPort());	
+	        	PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, errPacket, ProcessType.CLIENT, "ERROR");
+	
+	        	// keep going if error was unknown TID
+	        	// otherwise, rethrow so the client UI can print a message
+	        	if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID)
+	        		continue;
+	        	else 
+	        		return;
+	        }
+	        
+	        // if we get here, DATA 1 is good
+	        correctData = true;
         }
         
 		// set up receiver with request packet's port, as this is the client's TID

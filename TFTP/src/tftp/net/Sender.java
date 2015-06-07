@@ -131,19 +131,18 @@ public class Sender {
 			} catch (TFTPException e) {
 
 				// send error packet
-				DatagramPacket errPacket = null;
-				
-				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-					printToConsole("SENDER: received packet with unknown TID");											
-				}
-				
-				errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-						reply.getAddress(), reply.getPort());
-				
+				DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+						reply.getAddress(), reply.getPort());				
 				PacketUtil.sendPacketToProcess(threadLabel, socket, errPacket, receiverProcess, "ERROR");
 				
-				// rethrow so the owner of this Sender knows whats up
-				throw e;
+				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+					printToConsole("received packet with unknown TID");
+					// consider unknown TID a duplicate packet so we still wait for the right ACK
+					duplicatePacket = true;
+				} else {
+					// rethrow so the owner of this Sender knows whats up
+					throw e;
+				}
 			}
 			
 			if (!duplicatePacket) { blockNum++; }

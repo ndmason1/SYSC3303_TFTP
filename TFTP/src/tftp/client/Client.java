@@ -213,7 +213,7 @@ public class Client {
 		sendPacket = packetUtil.formWrqPacket(getFilename(), getMode());
 
 		// send packet to server
-		PacketUtil.sendPacketToProcess("", sendReceiveSocket, sendPacket, ProcessType.SERVER, "RRQ");
+		PacketUtil.sendPacketToProcess("", sendReceiveSocket, sendPacket, ProcessType.SERVER, "WRQ");
         boolean packetReceived = false;
         int retransmission = 0;
         
@@ -228,13 +228,14 @@ public class Client {
         		// TODO  how to resend twice if no response again
         		
     			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-    				throw new TFTPException("Server does not respond, maximum number of retransmissions reached, aborting operation", PacketUtil.ERR_UNDEFINED);
+    				throw new TFTPException(String.format("Could not reach server after %d retries, aborting request", 
+    						retransmission), PacketUtil.ERR_UNDEFINED);
     				
     			}
 
     			System.out.println("Socket Timeout for response of request packet, resending...");
     			
-    			PacketUtil.sendPacketToProcess("", sendReceiveSocket, sendPacket, ProcessType.SERVER, "RRQ");	
+    			PacketUtil.sendPacketToProcess("", sendReceiveSocket, sendPacket, ProcessType.SERVER, "WRQ");	
     			retransmission ++;
         	}
 		}
