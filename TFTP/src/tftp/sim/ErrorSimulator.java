@@ -145,7 +145,7 @@ public class ErrorSimulator {
 	private void showProcessMenu(String prevSelectionMessage) {
 
 		System.out.println(prevSelectionMessage);
-		if (simTypeSelection == SimulationType.ILLEGAL_OP || simTypeSelection == SimulationType.ILLEGAL_OP)
+		if (simTypeSelection == SimulationType.ILLEGAL_OP || simTypeSelection == SimulationType.UNKNOWN_TID)
 			System.out.println("Which process should receive the invalid packet? \n");
 		else if (simTypeSelection == SimulationType.PACKET_LOST)
 			System.out.println("Which process should expect the packet that gets lost? \n");
@@ -157,34 +157,38 @@ public class ErrorSimulator {
 		System.out.println("(1) Client");
 		System.out.println("(2) Server");
 		System.out.println("[ PRESS Q TO QUIT ]\n");
+		
+		String message = null;
 
 		switch (getMenuInput()) {
 		case 1: 
 			receiverProcessSelection = ProcessType.CLIENT;
+			message = "Client selected.";
 			break;
 		case 2:
 			receiverProcessSelection = ProcessType.SERVER;
+			message = "Server selected.";
 		}
 
 		switch (simTypeSelection) {
 		case ILLEGAL_OP:
-			showPacketTypeMenu();
+			showPacketTypeMenu(message);
 			break;
 
-		case UNKNOWN_TID:			
-			simulateUnknownTID();
+		case UNKNOWN_TID:
+			showPacketTypeMenu(message);
 			break;
 
 		case PACKET_DELAY:
-			showPacketTypeMenu();
+			showPacketTypeMenu(message);
 			break;
 
 		case PACKET_DUPLICATE:
-			showPacketTypeMenu();
+			showPacketTypeMenu(message);
 			break;
 
 		case PACKET_LOST:
-			showPacketTypeMenu();
+			showPacketTypeMenu(message);
 			break;
 
 		case NONE:
@@ -199,26 +203,63 @@ public class ErrorSimulator {
 	/**
 	 * Displays a menu for the user to select a type of packet that should be modified.
 	 * Currently only used for illegal operation mode.
+	 * 
+	 * @param message	string containing previous selection
 	 */
-	private void showPacketTypeMenu() {
-
-		// build message based on previous selection
-		String message = receiverProcessSelection == ProcessType.CLIENT ?
-				"Client" :
-					"Server"; 
-		message += " selected.";
-
+	private void showPacketTypeMenu(String message) {
+		
+		String verb = null;
+		switch (simTypeSelection) {
+		case ILLEGAL_OP:
+			verb = "modified";
+			break;
+			
+		case NONE:
+			return;
+			
+		case PACKET_DELAY:
+			verb = "delayed";
+			break;
+			
+		case PACKET_DUPLICATE:
+			verb = "duplicated";
+			break;
+			
+		case PACKET_LOST:
+			verb = "lost";
+			break;
+			
+		case UNKNOWN_TID:
+			verb = "sent from a different TID";
+			break;
+			
+		default:
+			return;		
+		}
+		
 		System.out.println(message);
-		System.out.println("Please choose which packet type should be modified/delayed/lost:\n");
-		if (receiverProcessSelection == ProcessType.SERVER) {
+		
+		// only show request packets if it makes sense for the simulation mode and the process chosen
+		boolean showRequestTypes = simTypeSelection != SimulationType.UNKNOWN_TID 
+				&& receiverProcessSelection == ProcessType.SERVER;
+		
+		 
+		
+		System.out.printf("Please choose which packet type should be %s:\n\n", verb);
+		if (showRequestTypes) {
 			System.out.println("(1) RRQ");
-			System.out.println("(2) WRQ");
+			System.out.println("(2) WRQ");			
 			System.out.println("(3) DATA (must start with WRQ)");
 			System.out.println("(4) ACK (must start with RRQ)");
 			System.out.println("(5) ERROR");
 		} else {
-			System.out.println("(1) DATA (must start with RRQ)");
-			System.out.println("(2) ACK (must start with WRQ)");
+			if (receiverProcessSelection == ProcessType.SERVER) {
+				System.out.println("(1) DATA (must start with WRQ)");
+				System.out.println("(2) ACK (must start with RRQ)");
+			} else {
+				System.out.println("(1) DATA (must start with RRQ)");
+				System.out.println("(2) ACK (must start with WRQ)");
+			}
 			System.out.println("(3) ERROR");
 		}
 
@@ -226,19 +267,19 @@ public class ErrorSimulator {
 
 		switch (getMenuInput()) {
 		case 1:
-			packetTypeSelection = receiverProcessSelection == ProcessType.SERVER ? PacketType.RRQ : PacketType.DATA;
+			packetTypeSelection = showRequestTypes ? PacketType.RRQ : PacketType.DATA;
 			break;
 
 		case 2:			
-			packetTypeSelection = receiverProcessSelection == ProcessType.SERVER ? PacketType.WRQ : PacketType.ACK;
+			packetTypeSelection = showRequestTypes ? PacketType.WRQ : PacketType.ACK;
 			break;
 
 		case 3:
-			packetTypeSelection = receiverProcessSelection == ProcessType.SERVER ? PacketType.DATA : PacketType.ERROR;
+			packetTypeSelection = showRequestTypes ? PacketType.DATA : PacketType.ERROR;
 			break;
 
 		case 4:
-			if (receiverProcessSelection == ProcessType.CLIENT) {
+			if (!showRequestTypes) {
 				System.out.println("Not a valid option! Returning to main menu");
 				return;
 			}				
@@ -246,7 +287,7 @@ public class ErrorSimulator {
 			break;
 
 		case 5:
-			if (receiverProcessSelection == ProcessType.CLIENT) {
+			if (!showRequestTypes) {
 				System.out.println("Not a valid option! Returning to main menu");
 				return;
 			}
@@ -264,6 +305,8 @@ public class ErrorSimulator {
 
 		switch (simTypeSelection) {
 		case ILLEGAL_OP:
+			if (getNumber)
+				showBlockNumberPrompt(packetTypeSelection.name() + " selected as packet to modify.");
 			showIllegalOpTypeMenu();
 			break;
 
@@ -276,7 +319,7 @@ public class ErrorSimulator {
 		case PACKET_DUPLICATE:
 			if (getNumber)
 				showBlockNumberPrompt(packetTypeSelection.name() + " selected as packet to duplicate.");
-			//simulateDuplicateddPacket();
+			simulateDuplicatePacket();
 			break;
 
 		case PACKET_LOST:
@@ -284,9 +327,16 @@ public class ErrorSimulator {
 				showBlockNumberPrompt(packetTypeSelection.name() + " selected as packet to drop.");
 			simulateLostPacket();
 			break;
-
+			
+		case UNKNOWN_TID:
+			if (getNumber)
+				showBlockNumberPrompt(packetTypeSelection.name() + " selected as packet to send from different TID.");
+			simulateUnknownTID();
+			break;
+			
 		default:
 			break;
+
 		} 		
 	}
 
@@ -294,7 +344,13 @@ public class ErrorSimulator {
 		System.out.println(prevSelectionMessage);		
 
 		System.out.println("Please enter the block number of the packet.");
+		if (simTypeSelection == SimulationType.UNKNOWN_TID) {
+			System.out.println("To establish server TID to client, block number must be:");
+			System.out.println(" - at least 2 if DATA chosen\n - at least 1 is ACK chosen");
+		}
+		
 		System.out.println("(note that the size of the file must be at least [blockNum] * 512 bytes)\n");
+		
 
 		String input = null;
 
@@ -306,7 +362,18 @@ public class ErrorSimulator {
 
 		} while (!input.matches("\\d{1,5}")); // keep looping until 5 or less digit number entered 
 
-		blockNumSelection = Integer.parseInt(input);		
+		blockNumSelection = Integer.parseInt(input);
+		
+		// enforce valid block number based on simulation and packet type
+		int min = -1;
+		if (packetTypeSelection == PacketType.DATA) {
+			min = simTypeSelection == SimulationType.UNKNOWN_TID ? 2 : 1;			
+		} else {
+			min = simTypeSelection == SimulationType.UNKNOWN_TID ? 1 : 0;
+		}
+		
+		if (blockNumSelection < min) blockNumSelection = min;
+			
 	}
 
 	/**
@@ -394,12 +461,6 @@ public class ErrorSimulator {
 			}			
 		}
 
-		System.out.println("\nChosen parameters for illegal operation simulation: ");
-		System.out.println("Process to receive error: " + receiverProcessSelection.name());
-		System.out.println("Packet type to modify: " + packetTypeSelection.name());
-		System.out.println("Packet field/property to modify: " + illegalOpTypeSelection.name());
-		System.out.println("\n");
-
 		simulateIllegalOperation();
 	}
 
@@ -471,70 +532,29 @@ public class ErrorSimulator {
 
 	/**
 	 * Runs "Unknown TID" mode. 
-	 * A packet's contents are not modified, but it is sent from a different socket so as to trigger
-	 * an "Unknown TID" (transfer ID) error.
-	 * The packet selected to trigger the error depends on whether the client sends a RRQ or WRQ to
-	 * start the simulation and the process chosen to receive the packet with unknown TID.
+	 * A packet is sent from a different socket so as to trigger an "Unknown TID" (transfer ID) error.
 	 */
-	private void simulateUnknownTID() {		
-
-		// TODO add expected packet enforcement so different packet types can be tested definitively
-
-		// build message based on previous selection
-		String message = receiverProcessSelection == ProcessType.CLIENT ?
-				"Client" :
-					"Server"; 
-		message += " selected.";
-		System.out.println(message);
-
-		if (receiverProcessSelection == ProcessType.CLIENT) {
-			System.out.println("If RRQ is made, Client will receive DATA 2 from unknown TID");
-			System.out.println("If WRQ is made, Client will receive ACK 1 from unknown TID");			
-		} else { // receiverProcess == ProcessType.SERVER
-			System.out.println("If RRQ is made, Server will receive ACK 1 from unknown TID");
-			System.out.println("If WRQ is made, Server will receive DATA 1 from unknown TID");
-		}
+	private void simulateUnknownTID() {
+		
+		System.out.println("\nChosen parameters for unknown TID simulation: ");
+		System.out.println("Process to receive packet from unknown TID: " + receiverProcessSelection.name());
+		System.out.println("Packet type to send from unknown TID: " + packetTypeSelection.name());
+		if (packetTypeSelection == PacketType.DATA || packetTypeSelection == PacketType.ACK)
+			System.out.println("block number of packet chosen packet: " + blockNumSelection);
 
 		System.out.println("\n==== EXECUTING SIMULATION ====\n");
 
 		byte data[] = new byte[PacketUtil.BUF_SIZE];
 		receivePacket = new DatagramPacket(data, data.length);
 
+		PacketType startingRequestType;
+
 		// listen for a client packet
 		receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "RRQ/WRQ");
-
 		clientIP = receivePacket.getAddress();
 		clientPort = receivePacket.getPort();
-
-		// check packet type
-		if ( ! (receivedPacketType == PacketType.RRQ || receivedPacketType == PacketType.WRQ) ) {
-			System.out.println("Wrong packet type received from client! (expected RRQ or WRQ) [FAIL]");
-			System.out.println("terminating simulation");
-			return;
-		}
-
-
-		// pass request to server (establish client TID to the server)
-		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
-				serverIP, Server.SERVER_PORT);
-
-		// send new packet to server
-		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
-
-		// receive server response
-		receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK/ERROR");
-
-		// maybe ERROR should be allowed here...
-		//		if (isErrorPacket(receivePacket)) {
-		//			System.out.println("unexpected ERROR packet received from client! [FAIL]");
-		//			System.out.println("terminating simulation");
-		//			return;
-		//		}
-
-		// save the server's TID for this simulation
-		int serverTID = receivePacket.getPort();
-
-		// pass server response to client, establish server TID to the client
+		
+		// create socket to send DATA/ACK to client
 		DatagramSocket clientSendRecvSocket = null;
 		try {
 			clientSendRecvSocket = new DatagramSocket();
@@ -543,64 +563,220 @@ public class ErrorSimulator {
 			e1.printStackTrace();
 		}
 
-		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
-		sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
-
-		// get first client DATA / ACK		
-		receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK/ERROR");		
-
-		// create a new socket to generate TID error
-		DatagramSocket unknownTIDSocket = null;
-		try {
-			unknownTIDSocket = new DatagramSocket();
-		} catch (SocketException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
+		// make sure starting request type actually IS a request
+		startingRequestType = receivedPacketType;
+		if (startingRequestType != PacketType.RRQ && startingRequestType != PacketType.WRQ) {
+			System.out.println("Need to start with request packet");
+			System.out.println("terminating simulation");
+			return;
 		}
-
-		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-		sendPacket.setAddress(serverIP);
-		sendPacket.setPort(serverTID);		
+		
+		// check that the parameters make sense e.g. server cant recv delayed ACK if started with WRQ
+		boolean exitSimulation = false;
+		PacketType expectedRequestType = null;
 
 		if (receiverProcessSelection == ProcessType.SERVER) {
-			System.out.println("[ next packet will be sent from unknown TID ]");
-			// server is receiving the unknown TID packet, send this from the unknown TID socket
-			sendPacketToProcess(unknownTIDSocket, ProcessType.SERVER, receivedPacketType.name());
-
-			// receive server response (should be an ERROR with code 5)
-			receivePacketFromProcess(unknownTIDSocket, ProcessType.SERVER, "ERROR");
-
-			// check result and display
-			printSimulationResult(ProcessType.SERVER, PacketUtil.ERR_UNKNOWN_TID);
-
-			// TODO finish transfer by sending packet from original client TID
-			// and finish remaining exchange
-
-		} else { 
-			// client is receiving unknown TID packet, send this out server socket
-			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK/ERROR");
-
-			// receive server response
-			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK/ERROR");
-
-			// pass response to client from unknown TID socket
-			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-			sendPacket.setAddress(clientIP);
-			sendPacket.setPort(clientPort);
-
-			System.out.println("sending server packet to client from unknown TID...");
-			sendPacketToProcess(unknownTIDSocket, ProcessType.CLIENT, "DATA/ACK/ERROR from unknown TID");
-
-			// receive client response (should be an ERROR with code 5)
-			receivePacketFromProcess(unknownTIDSocket, ProcessType.CLIENT, "ERROR (5)");
-
-			// check result and display
-			printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_UNKNOWN_TID);
-
+			if (startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.ACK) {					
+				expectedRequestType = PacketType.RRQ;
+				exitSimulation = true;
+			} else if (startingRequestType == PacketType.RRQ && packetTypeSelection == PacketType.DATA) {
+				expectedRequestType = PacketType.WRQ;
+				exitSimulation = true;
+			}
+		} else { // receiverProcessSelection == ProcessType.CLIENT
+			if (startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.DATA) {
+				expectedRequestType = PacketType.RRQ;
+				exitSimulation = true;
+			} else if (startingRequestType == PacketType.RRQ && packetTypeSelection == PacketType.ACK) {
+				expectedRequestType = PacketType.WRQ;
+				exitSimulation = true;
+			}
 		}
 
-		printEndSimulation();
+		if (exitSimulation) {
+			System.out.printf("Wrong packet type received from client! (expected %s)\n", expectedRequestType.name());
+			System.out.println("cannot proceed, finishing simulation...");
 
+			// send request to server
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);				
+			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+
+			// get server response
+			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+			int serverTID = receivePacket.getPort();
+
+			// send to client
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
+			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+
+			// finish transfer so client goes back to a ready state
+			finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+					ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
+
+			printEndSimulation();
+			clientSendRecvSocket.close();
+			return;
+		}
+		
+		PacketType serverSendType = startingRequestType == PacketType.RRQ ? 
+				PacketType.DATA : PacketType.ACK ;
+		PacketType clientSendType = startingRequestType == PacketType.RRQ ? 
+				PacketType.ACK : PacketType.DATA ;
+
+		// pass request to server (establish client TID to the server)
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+				serverIP, Server.SERVER_PORT);
+		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+
+		// receive server response
+		receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, serverSendType.name());
+		
+		// save the server's TID for this simulation
+		int serverTID = receivePacket.getPort();
+
+		// pass server response to client, establish server TID to the client		
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
+		sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+		
+		// continue with transfer		
+		boolean lastData = false;
+		boolean lastAck = false;
+		int currentBlockNum = 1;		
+
+		while (!lastAck) {
+
+			// receive client DATA/ACK
+			receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, clientSendType.name());			
+			currentBlockNum = PacketUtil.getBlockNumber(receivePacket);						
+
+			// check if the packet should be dropped
+			if (receiverProcessSelection == ProcessType.SERVER) {
+				if (currentBlockNum == blockNumSelection ) {
+					System.out.println("\n\tSending next packet from unknown TID");
+					
+					// send the packet from a new socket (new TID)
+					DatagramSocket unknownTIDSocket = null;
+					try {						
+						unknownTIDSocket = new DatagramSocket();
+					} catch (SocketException e1) {
+						e1.printStackTrace();
+					}
+
+					// save packet details so it can be resent
+					byte[] originalPacketData = new byte[PacketUtil.BUF_SIZE];
+					int originalLength = receivePacket.getLength();
+					System.arraycopy(receivePacket.getData(), 0, originalPacketData, 0, originalLength);
+					
+					// send to server from unknown TID		
+					sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, serverTID);				
+					sendPacketToProcess(unknownTIDSocket, ProcessType.SERVER, receivedPacketType.name());
+					
+					// receive server response (should be an ERROR with code 5)
+					receivePacketFromProcess(unknownTIDSocket, ProcessType.SERVER, "ERROR");
+
+					// check result and display
+					printSimulationResult(ProcessType.SERVER, PacketUtil.ERR_UNKNOWN_TID);
+					
+					// send out the original server socket to finish transfer
+					System.out.println("\n\tFinishing transfer");
+					
+					sendPacket = new DatagramPacket(originalPacketData, originalLength, serverIP, serverTID);				
+					sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, PacketUtil.getPacketType(sendPacket).name());
+					
+					finishTransfer(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID,
+							ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort);
+										
+					// end simulation
+					printEndSimulation();
+					clientSendRecvSocket.close();
+					return;
+				}
+			}
+
+			// send to server 
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, serverTID);				
+			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+			
+			// check if we are done (no more blocks to send)
+			if (lastAck) {
+				System.out.println("Final ACK packet was sent!");
+				System.out.println("File was too small to send selected block number from unknown TID. [FAIL]");
+				System.out.println("Terminating simulation.");
+				printEndSimulation();
+				clientSendRecvSocket.close();
+				return;
+			}
+
+			// get server response
+			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, serverSendType.name());
+			currentBlockNum = PacketUtil.getBlockNumber(receivePacket);
+			
+			if (isFinalDataPacket(receivePacket)) {
+				// this packet is the final data packet
+				lastData = true;
+			} else if (lastData) {
+				// this packet is the final ack packet
+				lastAck = true;
+			}
+
+			// check if the packet should be dropped
+			if (receiverProcessSelection == ProcessType.CLIENT) {
+				if (currentBlockNum == blockNumSelection ) {
+					System.out.println("\n\tSending next packet from unknown TID");
+
+					// send the packet from a new socket (new TID)
+					DatagramSocket unknownTIDSocket = null;
+					try {						
+						unknownTIDSocket = new DatagramSocket();
+					} catch (SocketException e1) {
+						e1.printStackTrace();
+					}
+
+					// save packet details so it can be resent
+					byte[] originalPacketData = new byte[PacketUtil.BUF_SIZE];
+					int originalLength = receivePacket.getLength();
+					System.arraycopy(receivePacket.getData(), 0, originalPacketData, 0, originalLength);
+
+					// send to client from unknown TID					
+					sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
+					sendPacketToProcess(unknownTIDSocket, ProcessType.CLIENT, receivedPacketType.name());
+
+					// receive server response (should be an ERROR with code 5)
+					receivePacketFromProcess(unknownTIDSocket, ProcessType.CLIENT, "ERROR");
+
+					// check result and display
+					printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_UNKNOWN_TID);
+
+					// send out the original server socket to finish transfer
+					System.out.println("\n\tFinishing transfer");
+
+					sendPacket = new DatagramPacket(originalPacketData, originalLength, clientIP, clientPort);				
+					sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, PacketUtil.getPacketType(sendPacket).name());
+
+					finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort,
+							ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
+
+					// end simulation
+					printEndSimulation();
+					clientSendRecvSocket.close();
+					return;
+				}
+			}			
+
+			// send to client and end this loop iteration
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
+			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+			
+			// check if we are done (no more blocks to send)
+			if (lastAck) {
+				System.out.println("Final ACK packet was sent!");
+				System.out.println("File was too small to send selected block number from unknown TID. [FAIL]");
+				System.out.println("Terminating simulation.");
+				printEndSimulation();
+				clientSendRecvSocket.close();
+				return;
+			}
+		}
 	}
 
 	/**
@@ -611,12 +787,19 @@ public class ErrorSimulator {
 	 * modified packet. 
 	 */
 	private void simulateIllegalOperation() {
+		
+		System.out.println("\nChosen parameters for illegal operation simulation: ");
+		System.out.println("Process to receive illegal packet: " + receiverProcessSelection.name());
+		System.out.println("Packet type to modify: " + packetTypeSelection.name());
+		if (packetTypeSelection == PacketType.DATA || packetTypeSelection == PacketType.ACK)
+			System.out.println("block number of packet chosen packet: " + blockNumSelection);
+		System.out.println("Packet field/property to modify: " + illegalOpTypeSelection.name());
+		System.out.println("\n");
 
 		System.out.println("==== EXECUTING SIMULATION ====");
 
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
-		receivePacket = new DatagramPacket(data, data.length);			
-		receivePacket.getLength();
+		receivePacket = new DatagramPacket(data, data.length);
 
 		// this variable is used to keep track of whether the client sent a RRQ or WRQ to start the exchange
 		// this is necessary because if packetType is DATA, ACK, or ERROR, we need to know which side is sending
@@ -963,43 +1146,51 @@ public class ErrorSimulator {
 
 	/**
 	 * Runs "Lost Packet" mode. 
-	 * A received packet is "lost" by not forwarding it to the other process.
+	 * A received packet is dropped by not forwarding it to the other process.
 	 * Retransmissions are expected.
 	 */
 	private void simulateLostPacket() {
-
+		
 		// prompt for amount of packets to lose
 		System.out.println("Please enter the number of times the chosen packet should get lost (1-3):\n");
-
+	
 		String input = null;
-
+	
 		do {
 			System.out.print("> ");
 			input = keyboard.nextLine();
 			if (input.toLowerCase().charAt(0) == 'q')
 				quit();
-
+	
 		} while (!input.matches("[1-3]")); // keep looping until number from 1 to 3 entered 
-
+	
 		int numDrops = Integer.parseInt(input);
-
+		
+		System.out.println("\nChosen parameters for lost packet simulation: ");
+		System.out.println("Process expecting packet that will be dropped: " + receiverProcessSelection.name());
+		System.out.println("Packet type to drop: " + packetTypeSelection.name());
+		if (packetTypeSelection == PacketType.DATA || packetTypeSelection == PacketType.ACK)
+			System.out.println("block number of chosen packet: " + blockNumSelection);
+		System.out.println("Number of times packet will be dropped: " + numDrops);
+		System.out.println("\n");
+	
 		System.out.println("==== EXECUTING SIMULATION ====\n");
-
+	
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
 		receivePacket = new DatagramPacket(data, data.length);			
 		receivePacket.getLength();
-
+	
 		// this variable is used to keep track of whether the client sent a RRQ or WRQ to start the exchange
 		// this is necessary because if packetType is DATA, ACK, or ERROR, we need to know which side is sending
 		// DATA packets and which side is sending ACK packets so we know which packet to delay
 		PacketType startingRequestType;
-
+	
 		// listen for a client packet
 		receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "RRQ/WRQ");
-
+	
 		clientIP = receivePacket.getAddress();
 		clientPort = receivePacket.getPort();
-
+	
 		// make sure starting request type actually IS a request
 		startingRequestType = receivedPacketType;
 		if (startingRequestType != PacketType.RRQ && startingRequestType != PacketType.WRQ) {
@@ -1007,7 +1198,7 @@ public class ErrorSimulator {
 			System.out.println("terminating simulation");
 			return;
 		}
-
+	
 		// set up a new socket to send server packets to the client
 		DatagramSocket clientSendRecvSocket = null;
 		try {
@@ -1016,7 +1207,7 @@ public class ErrorSimulator {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-
+	
 		// if chosen packet type is request packet, need to make sure what was received matches
 		if (packetTypeSelection == PacketType.RRQ || packetTypeSelection == PacketType.WRQ) {
 			if (packetTypeSelection == PacketType.RRQ && receivedPacketType != PacketType.RRQ) {
@@ -1028,26 +1219,26 @@ public class ErrorSimulator {
 				System.out.println("terminating simulation");
 				return;
 			} else {				
-
+	
 				// received RRQ/WRQ, now it must be dropped
 				System.out.printf("%s packet will be dropped.\n\n", receivedPacketType.name());
-
+	
 				for (int i = 1; i < numDrops; i++) {					
 					// "drop" the last packet received by doing nothing
 					// receive retransmitted packet 
 					receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, packetTypeSelection.name());
 					System.out.printf("%s packet will be dropped.\n\n", receivedPacketType.name());
 				}
-
+	
 				if (numDrops == 3) {  
 					// simulation over
-
+	
 					System.out.println("no further retransmissions expected from client.");
-
+	
 					// listen for extra retransmit anyways
 					// set timeout on client receive socket  
 					PacketUtil.setSocketTimeout(clientRecvSocket, 2*TIMEOUT_MS);
-
+	
 					// listen to detect extra retransmits
 					System.out.println("\n\tListening for further retransmissions from client");
 					boolean timedOut = false;
@@ -1056,62 +1247,62 @@ public class ErrorSimulator {
 					} catch (SocketTimeoutException e) {
 						timedOut = true;
 					}
-
+	
 					if (!timedOut) {
 						System.out.println("\nIncorrectly received an extra retransmission from client! [FAIL]");
 					} else {
 						System.out.println("\nSocket timed out, no further retransmission received [PASS]");
 					}
-
+	
 					// reset timeout to 0  
 					PacketUtil.setSocketTimeout(clientRecvSocket, 0);
-
+	
 					// end simulation
 					printEndSimulation();
 					clientSendRecvSocket.close();
 					return;
 				}
-
+	
 				System.out.println("\tadditional retransmission expected from client");
-
+	
 				// get the next request that won't be dropped
 				receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "retransmitted "+packetTypeSelection.name());
-
+	
 				// send the the retransmission
 				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
 				sendPacket.setAddress(serverIP);
 				sendPacket.setPort(Server.SERVER_PORT);
 				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, 
 						"retransmitted "+packetTypeSelection.name());
-
+	
 				// get response
 				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK");
 				int serverTID = receivePacket.getPort();
-
+	
 				// pass to client
 				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
 				sendPacket.setAddress(clientIP);
 				sendPacket.setPort(clientPort);					
 				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK");
-
+	
 				// finish transfer
 				finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
 						ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);				
-
+	
 				// end simulation
 				printEndSimulation();
 				clientSendRecvSocket.close();
 				return;
 			}
-
+	
 		}
-
+	
 		// packetTypeSelection is DATA, ACK, or ERROR
 		// check that the parameters make sense e.g. server cant recv delayed ACK if started with WRQ
-
+	
 		boolean exitSimulation = false;
 		PacketType expectedRequestType = null;
-
+	
 		if (receiverProcessSelection == ProcessType.SERVER) {
 			if (startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.ACK) {					
 				expectedRequestType = PacketType.RRQ;
@@ -1129,73 +1320,73 @@ public class ErrorSimulator {
 				exitSimulation = true;
 			}
 		}
-
+	
 		if (exitSimulation) {
 			System.out.printf("Wrong packet type received from client! (expected %s)\n", expectedRequestType.name());
 			System.out.println("cannot proceed, finishing simulation...");
-
+	
 			// send request to server
 			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);				
 			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
-
+	
 			// get server response
 			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
 			int serverTID = receivePacket.getPort();
-
+	
 			// send to client
 			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
 			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
-
+	
 			// finish transfer so client goes back to a ready state
 			finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
 					ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
-
+	
 			printEndSimulation();
 			return;
 		}
-
+	
 		// packetTypeSelection is DATA, ACK, or ERROR
 		// continue with transfer
-
+	
 		boolean done = false;
 		int currentBlockNum = 1;
 		int serverTID = 0;
-
-
+	
+	
 		// send to server 
 		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);				
 		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
-
+	
 		while (!done) {
-
+	
 			// receive server DATA/ACK
 			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK");
 			currentBlockNum = PacketUtil.getBlockNumber(receivePacket);
 			serverTID = receivePacket.getPort();
-
+	
 			if (receiverProcessSelection == ProcessType.CLIENT) {
-
+	
 				if (currentBlockNum == blockNumSelection ) {
-
+	
 					// drop this ACK/DATA packet
 					System.out.printf("%s packet will be dropped.\n\n", packetTypeSelection.name());
-
+	
 					for (int i = 1; i < numDrops; i++) {					
 						// "drop" the last packet received by doing nothing
 						// receive retransmitted packet 
 						receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, packetTypeSelection.name());
 						System.out.printf("%s packet will be dropped.\n\n", packetTypeSelection.name());
 					}
-
+	
 					if (numDrops == 3) {  
 						// simulation over
-
+	
 						System.out.println("no further retransmissions expected from server.");
-
+	
 						// listen for extra retransmit anyways
 						// set timeout on client receive socket  
 						PacketUtil.setSocketTimeout(serverSendRecvSocket, 2*TIMEOUT_MS);
-
+	
 						// listen to detect extra retransmits
 						System.out.println("\n\tListening for further retransmissions from server...");
 						boolean timedOut = false;
@@ -1204,96 +1395,78 @@ public class ErrorSimulator {
 						} catch (SocketTimeoutException e) {
 							timedOut = true;
 						}
-
+	
 						if (!timedOut) {
 							System.out.println("\nIncorrectly received an extra retransmission from server! [FAIL]");
 						} else {
 							System.out.println("\nSocket timed out, no further retransmission received [PASS]");
 						}
-
+	
 						// reset timeout to 0  
 						PacketUtil.setSocketTimeout(serverSendRecvSocket, 0);
-
+	
 						// end simulation
 						printEndSimulation();
+						clientSendRecvSocket.close();
 						return;
 					}
-
-					//						
-					//						if (startingRequestType == PacketType.RRQ) {
-					//							// client send ACK, server send DATA
-					//							getAndSendRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
-					//									ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, numDrops);
-					//						} else {
-					//							// client send DATA, server send ACK
-					//							getAndSendRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
-					//									ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, numDrops);
-					//						}
-
-					//						System.out.println("additional retransmission expected from server");
-					//						System.out.println("finishing transfer...");
-					//
-					//						// get the next request that won't be dropped
-					//						receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "retransmitted "+packetTypeSelection.name());
-					//
-					//						// send the the retransmission
-					//						sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-					//						sendPacket.setAddress(clientIP);
-					//						sendPacket.setPort(clientPort);
-					//						sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, 
-					//								"retransmitted "+packetTypeSelection.name());
-					//
-					//						// get response
-					//						receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK");						
-					//
-					//						// pass to server
-					//						sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-					//						sendPacket.setAddress(serverIP);
-					//						sendPacket.setPort(serverTID);					
-					//						sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK");
-
+	
+					// deal with retransmissions from both sides resulting from lost packet
+	
+					if (startingRequestType == PacketType.RRQ) {
+						// client send ACK, server send DATA
+						getAndSendRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+								ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, numDrops);
+					} else {
+						// client send DATA, server send ACK
+						getAndSendRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
+								ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, numDrops);
+					}
+					
 					// finish transfer
-					finishTransfer(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID,
-							ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort);				
-
+					System.out.println("finishing transfer...");
+					finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort,
+							ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);				
+	
 					// end simulation
 					printEndSimulation();
+					clientSendRecvSocket.close();
 					return;	
-
+	
 				}
 			} 
-
+	
 			// send to client
 			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
 			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
-
+	
 			// get client response				
 			receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK");
 			currentBlockNum = PacketUtil.getBlockNumber(receivePacket);
-
+	
 			// check if the packet should be dropped
 			if (receiverProcessSelection == ProcessType.SERVER) {
 				if (currentBlockNum == blockNumSelection ) {
-
+	
 					// drop this client packet
 					System.out.printf("%s packet will be dropped.\n\n",  packetTypeSelection.name());
-
+	
 					for (int i = 1; i < numDrops; i++) {					
 						// "drop" the last packet received by doing nothing
 						// receive retransmitted packet 
 						receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, packetTypeSelection.name());
 						System.out.printf("%s packet will be dropped.\n\n",  packetTypeSelection.name());
 					}
-
+	
 					if (numDrops == 3) {  
 						// simulation over
-
+	
 						System.out.println("no further retransmissions expected from client.");
-
+	
 						// listen for extra retransmit anyways
 						// set timeout on client receive socket  
 						PacketUtil.setSocketTimeout(clientSendRecvSocket, 2*TIMEOUT_MS);
-
+	
 						// listen to detect extra retransmits
 						System.out.println("\n\tListening for further retransmissions from client...");
 						boolean timedOut = false;
@@ -1302,68 +1475,59 @@ public class ErrorSimulator {
 						} catch (SocketTimeoutException e) {
 							timedOut = true;
 						}
-
+	
 						if (!timedOut) {
 							System.out.println("\nIncorrectly received an extra retransmission from client! [FAIL]");
 						} else {
 							System.out.println("\nSocket timed out, no further retransmission received [PASS]");
 						}
-
+	
 						// reset timeout to 0  
 						PacketUtil.setSocketTimeout(clientSendRecvSocket, 0);
-
+	
 						// end simulation
 						printEndSimulation();
 						return;
 					}
-
-					System.out.println("additional retransmission expected from client");
-					System.out.println("finishing transfer...");
-
-					// get the next request that won't be dropped
-					receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "retransmitted "+packetTypeSelection.name());
-
-					// send the the retransmission
-					sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-					sendPacket.setAddress(serverIP);
-					sendPacket.setPort(serverTID);
-					sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, 
-							"retransmitted "+packetTypeSelection.name());
-
-					// get response
-					receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK");
-
-					// pass to client
-					sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-					sendPacket.setAddress(clientIP);
-					sendPacket.setPort(clientPort);					
-					sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK");
-
+					
+					// deal with retransmissions from both sides resulting from lost packet
+	
+					if (startingRequestType == PacketType.RRQ) {
+						// client send ACK, server send DATA
+						getAndSendRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+								ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, numDrops);
+					} else {
+						// client send DATA, server send ACK
+						getAndSendRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
+								ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, numDrops);
+					}
+					
 					// finish transfer
-					finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
-							ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);				
-
+					System.out.println("finishing transfer...");
+					finishTransfer(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID,
+							ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort);				
+	
 					// end simulation
 					printEndSimulation();
-					return;
-
+					clientSendRecvSocket.close();
+					return;	
 				}
 			}
-
-			// send to server and end this iteration
+	
+			// send to server and end this loop iteration
 			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, serverTID);				
 			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
-
-
+			
+			
 		}
-
-
+	
 	}
 
 	/**
 	 * Runs "Delayed Packet" mode. 
 	 * A packet is received is "delayed" by waiting a specified amount of time 
 	 * before sending it to the other process.
+	 * Retransmissions are expected if the delay is sufficient.
 	 */
 	private void simulateDelayedPacket() {
 
@@ -1384,8 +1548,14 @@ public class ErrorSimulator {
 
 		// get number of retransmits expected from the process who sends delayed packet
 		int expectedRetransmits = (int) Math.min( Math.floor(delayInMs / TIMEOUT_MS), 2.0 );
-
-		System.out.printf("Delay selected: %dms. (%d retransmission(s) expected)\n\n", delayInMs, expectedRetransmits);		
+		
+		System.out.println("\nChosen parameters for delayed packet simulation: ");
+		System.out.println("Process to receive delayed packet: " + receiverProcessSelection.name());
+		System.out.println("Packet type to delay: " + packetTypeSelection.name());
+		if (packetTypeSelection == PacketType.DATA || packetTypeSelection == PacketType.ACK)
+			System.out.println("Block number of chosen packet: " + blockNumSelection);
+		System.out.printf("Duration of delay: %d (%d retransmission(s) expected)\n\n", delayInMs, expectedRetransmits);
+				
 		System.out.println("==== EXECUTING SIMULATION ====\n");
 
 		byte data[] = new byte[PacketUtil.BUF_SIZE];		
@@ -1573,6 +1743,382 @@ public class ErrorSimulator {
 	}
 
 
+
+	/**
+	 * Runs "Duplicate Packet" mode. 
+	 * A received packet is duplicated by forwarding it to the other process twice in a row.
+	 */
+	private void simulateDuplicatePacket() {
+	
+		// prompt for number of times to send duplicate
+		System.out.println("Please enter the number of times the chosen packet should get duplicated (1-99):\n");	
+		String input = null;
+	
+		do {
+			System.out.print("> ");
+			input = keyboard.nextLine();
+			if (input.toLowerCase().charAt(0) == 'q')
+				quit();
+	
+		} while (!input.matches("[1-9]|[1-9][0-9]")); // keep looping until max 2 digit number entered 
+	
+		int numDups = Integer.parseInt(input);
+		
+		System.out.println("\nChosen parameters for duplicated packet simulation: ");
+		System.out.println("Process to receive duplicated packet: " + receiverProcessSelection.name());
+		System.out.println("Packet type to duplicated: " + packetTypeSelection.name());
+		if (packetTypeSelection == PacketType.DATA || packetTypeSelection == PacketType.ACK)
+			System.out.println("Block number of chosen packet: " + blockNumSelection);
+		System.out.printf("Number of duplicates sent: %d\n\n", numDups);
+	
+		System.out.println("==== EXECUTING SIMULATION ====\n");
+	
+		byte data[] = new byte[PacketUtil.BUF_SIZE];		
+		receivePacket = new DatagramPacket(data, data.length);			
+		receivePacket.getLength();
+	
+		// this variable is used to keep track of whether the client sent a RRQ or WRQ to start the exchange
+		// this is necessary because if packetType is DATA, ACK, or ERROR, we need to know which side is sending
+		// DATA packets and which side is sending ACK packets so we know which packet to delay
+		PacketType startingRequestType;
+	
+		// listen for a client packet
+		receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "RRQ/WRQ");
+	
+		clientIP = receivePacket.getAddress();
+		clientPort = receivePacket.getPort();
+	
+		// make sure starting request type actually IS a request
+		startingRequestType = receivedPacketType;
+		if (startingRequestType != PacketType.RRQ && startingRequestType != PacketType.WRQ) {
+			System.out.println("Need to start with request packet");
+			System.out.println("terminating simulation");
+			return;
+		}
+	
+		// set up a new socket to send server packets to the client
+		DatagramSocket clientSendRecvSocket = null;
+		try {
+			clientSendRecvSocket = new DatagramSocket();
+		} catch (SocketException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+	
+		// if chosen packet type is request packet, need to make sure what was received matches
+		if (packetTypeSelection == PacketType.RRQ || packetTypeSelection == PacketType.WRQ) {
+			if (packetTypeSelection == PacketType.RRQ && receivedPacketType != PacketType.RRQ) {
+				System.out.println("Wrong packet type received from client! (expected RRQ)");
+				System.out.println("terminating simulation");
+				return;				
+			} else if (packetTypeSelection == PacketType.WRQ && receivedPacketType != PacketType.WRQ) { 
+				System.out.println("Wrong packet type received from client! (expected WRQ)");
+				System.out.println("terminating simulation");
+				return;
+			} else {				
+	
+				// received RRQ/WRQ, now it must be dropped
+				System.out.printf("%s packet will be dropped.\n\n", receivedPacketType.name());
+	
+				for (int i = 1; i < numDups; i++) {					
+					// "drop" the last packet received by doing nothing
+					// receive retransmitted packet 
+					receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, packetTypeSelection.name());
+					System.out.printf("%s packet will be dropped.\n\n", receivedPacketType.name());
+				}
+	
+				if (numDups == 3) {  
+					// simulation over
+	
+					System.out.println("no further retransmissions expected from client.");
+	
+					// listen for extra retransmit anyways
+					// set timeout on client receive socket  
+					PacketUtil.setSocketTimeout(clientRecvSocket, 2*TIMEOUT_MS);
+	
+					// listen to detect extra retransmits
+					System.out.println("\n\tListening for further retransmissions from client");
+					boolean timedOut = false;
+					try {				
+						receivePacketOrTimeout(clientRecvSocket, ProcessType.CLIENT, "retransmitted "+packetTypeSelection.name());
+					} catch (SocketTimeoutException e) {
+						timedOut = true;
+					}
+	
+					if (!timedOut) {
+						System.out.println("\nIncorrectly received an extra retransmission from client! [FAIL]");
+					} else {
+						System.out.println("\nSocket timed out, no further retransmission received [PASS]");
+					}
+	
+					// reset timeout to 0  
+					PacketUtil.setSocketTimeout(clientRecvSocket, 0);
+	
+					// end simulation
+					printEndSimulation();
+					clientSendRecvSocket.close();
+					return;
+				}
+	
+				System.out.println("\tadditional retransmission expected from client");
+	
+				// get the next request that won't be dropped
+				receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "retransmitted "+packetTypeSelection.name());
+	
+				// send the the retransmission
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+				sendPacket.setAddress(serverIP);
+				sendPacket.setPort(Server.SERVER_PORT);
+				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, 
+						"retransmitted "+packetTypeSelection.name());
+	
+				// get response
+				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK");
+				int serverTID = receivePacket.getPort();
+	
+				// pass to client
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+				sendPacket.setAddress(clientIP);
+				sendPacket.setPort(clientPort);					
+				sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK");
+	
+				// finish transfer
+				finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+						ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);				
+	
+				// end simulation
+				printEndSimulation();
+				clientSendRecvSocket.close();
+				return;
+			}
+	
+		}
+	
+		// packetTypeSelection is DATA, ACK, or ERROR
+		// check that the parameters make sense e.g. server cant recv delayed ACK if started with WRQ
+	
+		boolean exitSimulation = false;
+		PacketType expectedRequestType = null;
+	
+		if (receiverProcessSelection == ProcessType.SERVER) {
+			if (startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.ACK) {					
+				expectedRequestType = PacketType.RRQ;
+				exitSimulation = true;
+			} else if (startingRequestType == PacketType.RRQ && packetTypeSelection == PacketType.DATA) {
+				expectedRequestType = PacketType.WRQ;
+				exitSimulation = true;
+			}
+		} else { // receiverProcessSelection == ProcessType.CLIENT
+			if (startingRequestType == PacketType.WRQ && packetTypeSelection == PacketType.DATA) {
+				expectedRequestType = PacketType.RRQ;
+				exitSimulation = true;
+			} else if (startingRequestType == PacketType.RRQ && packetTypeSelection == PacketType.ACK) {
+				expectedRequestType = PacketType.WRQ;
+				exitSimulation = true;
+			}
+		}
+	
+		if (exitSimulation) {
+			System.out.printf("Wrong packet type received from client! (expected %s)\n", expectedRequestType.name());
+			System.out.println("cannot proceed, finishing simulation...");
+	
+			// send request to server
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);				
+			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+	
+			// get server response
+			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+			int serverTID = receivePacket.getPort();
+	
+			// send to client
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
+			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+	
+			// finish transfer so client goes back to a ready state
+			finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+					ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
+	
+			printEndSimulation();
+			return;
+		}
+	
+		// packetTypeSelection is DATA, ACK, or ERROR
+		// continue with transfer
+	
+		boolean done = false;
+		int currentBlockNum = 1;
+		int serverTID = 0;
+	
+	
+		// send to server 
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);				
+		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+	
+		while (!done) {
+	
+			// receive server DATA/ACK
+			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK");
+			currentBlockNum = PacketUtil.getBlockNumber(receivePacket);
+			serverTID = receivePacket.getPort();
+	
+			if (receiverProcessSelection == ProcessType.CLIENT) {
+	
+				if (currentBlockNum == blockNumSelection ) {
+	
+					// drop this ACK/DATA packet
+					System.out.printf("%s packet will be dropped.\n\n", packetTypeSelection.name());
+	
+					for (int i = 1; i < numDups; i++) {					
+						// "drop" the last packet received by doing nothing
+						// receive retransmitted packet 
+						receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, packetTypeSelection.name());
+						System.out.printf("%s packet will be dropped.\n\n", packetTypeSelection.name());
+					}
+	
+					if (numDups == 3) {  
+						// simulation over
+	
+						System.out.println("no further retransmissions expected from server.");
+	
+						// listen for extra retransmit anyways
+						// set timeout on client receive socket  
+						PacketUtil.setSocketTimeout(serverSendRecvSocket, 2*TIMEOUT_MS);
+	
+						// listen to detect extra retransmits
+						System.out.println("\n\tListening for further retransmissions from server...");
+						boolean timedOut = false;
+						try {				
+							receivePacketOrTimeout(serverSendRecvSocket, ProcessType.SERVER, "retransmitted "+packetTypeSelection.name());
+						} catch (SocketTimeoutException e) {
+							timedOut = true;
+						}
+	
+						if (!timedOut) {
+							System.out.println("\nIncorrectly received an extra retransmission from server! [FAIL]");
+						} else {
+							System.out.println("\nSocket timed out, no further retransmission received [PASS]");
+						}
+	
+						// reset timeout to 0  
+						PacketUtil.setSocketTimeout(serverSendRecvSocket, 0);
+	
+						// end simulation
+						printEndSimulation();
+						clientSendRecvSocket.close();
+						return;
+					}
+	
+					// deal with retransmissions from both sides resulting from lost packet
+	
+					if (startingRequestType == PacketType.RRQ) {
+						// client send ACK, server send DATA
+						getAndSendRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+								ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, numDups);
+					} else {
+						// client send DATA, server send ACK
+						getAndSendRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
+								ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, numDups);
+					}
+					
+					// finish transfer
+					System.out.println("finishing transfer...");
+					finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort,
+							ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);				
+	
+					// end simulation
+					printEndSimulation();
+					clientSendRecvSocket.close();
+					return;	
+	
+				}
+			} 
+	
+			// send to client
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
+			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+	
+			// get client response				
+			receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK");
+			currentBlockNum = PacketUtil.getBlockNumber(receivePacket);
+	
+			// check if the packet should be dropped
+			if (receiverProcessSelection == ProcessType.SERVER) {
+				if (currentBlockNum == blockNumSelection ) {
+	
+					// drop this client packet
+					System.out.printf("%s packet will be dropped.\n\n",  packetTypeSelection.name());
+	
+					for (int i = 1; i < numDups; i++) {					
+						// "drop" the last packet received by doing nothing
+						// receive retransmitted packet 
+						receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, packetTypeSelection.name());
+						System.out.printf("%s packet will be dropped.\n\n",  packetTypeSelection.name());
+					}
+	
+					if (numDups == 3) {  
+						// simulation over
+	
+						System.out.println("no further retransmissions expected from client.");
+	
+						// listen for extra retransmit anyways
+						// set timeout on client receive socket  
+						PacketUtil.setSocketTimeout(clientSendRecvSocket, 2*TIMEOUT_MS);
+	
+						// listen to detect extra retransmits
+						System.out.println("\n\tListening for further retransmissions from client...");
+						boolean timedOut = false;
+						try {				
+							receivePacketOrTimeout(clientSendRecvSocket, ProcessType.CLIENT, "retransmitted "+packetTypeSelection.name());
+						} catch (SocketTimeoutException e) {
+							timedOut = true;
+						}
+	
+						if (!timedOut) {
+							System.out.println("\nIncorrectly received an extra retransmission from client! [FAIL]");
+						} else {
+							System.out.println("\nSocket timed out, no further retransmission received [PASS]");
+						}
+	
+						// reset timeout to 0  
+						PacketUtil.setSocketTimeout(clientSendRecvSocket, 0);
+	
+						// end simulation
+						printEndSimulation();
+						return;
+					}
+					
+					// deal with retransmissions from both sides resulting from lost packet
+	
+					if (startingRequestType == PacketType.RRQ) {
+						// client send ACK, server send DATA
+						getAndSendRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+								ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, numDups);
+					} else {
+						// client send DATA, server send ACK
+						getAndSendRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
+								ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, numDups);
+					}
+					
+					// finish transfer
+					System.out.println("finishing transfer...");
+					finishTransfer(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID,
+							ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort);				
+	
+					// end simulation
+					printEndSimulation();
+					clientSendRecvSocket.close();
+					return;	
+				}
+			}
+	
+			// send to server and end this loop iteration
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, serverTID);				
+			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+			
+			
+		}
+	
+	}
 
 	/**
 	 * Terminate the ErrorSimulator's execution. 
@@ -1771,22 +2317,18 @@ public class ErrorSimulator {
 
 			// get retransmitted ACK
 			receivePacketFromProcess(ackSocket, ackProcess, "retransmitted ACK");
-			ack = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
 
 			// send retransmitted ACK (should be ignored)
-			//sendPacket = new DatagramPacket(ack.getData(), ack.getLength(), dataAddr, dataPort);
 			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), ackAddr, ackPort);
 			sendPacketToProcess(dataSocket, dataProcess, "retransmitted ACK");
 
-		}
-
-		for (int i = 0; i < expectedRetransmits; i++) {
 			// get ACK from retransmitted DATA
 			receivePacketFromProcess(ackSocket, ackProcess, "ACK");
 
 			// send ACK from retransmitted DATA (should be ignored)
 			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), ackAddr, ackPort);
 			sendPacketToProcess(dataSocket, dataProcess, "ACK");
+
 		}
 
 		// transfer should now be "caught up"
@@ -1907,6 +2449,12 @@ public class ErrorSimulator {
 		return errCode != PacketUtil.ERR_UNKNOWN_TID;
 	}
 
+	/**
+	 * Returns true if an ERROR packet will end a transfer once it is received.
+	 *  
+	 *  @param packet	the packet to inspect
+	 *  @return			false if not an ERROR packet or error code is 5 (unknown TID)
+	 */
 	private void simulateRetransmittedRequestPackets(DatagramSocket clientSendRecvSocket, int expectedRetransmits) {
 
 		// for each retransmit expected...
@@ -1959,34 +2507,6 @@ public class ErrorSimulator {
 			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "ERROR");
 
 		}
-
-		//		// get the next request that won't be dropped
-		//		receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, "retransmitted "+packetTypeSelection.name());
-		//
-		//		// send the the retransmission
-		//		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-		//		sendPacket.setAddress(serverIP);
-		//		sendPacket.setPort(Server.SERVER_PORT);
-		//		sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, 
-		//				"retransmitted "+packetTypeSelection.name());
-		//
-		//		// get response
-		//		receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ACK");
-		//		int serverTID = receivePacket.getPort();
-		//
-		//		// pass to client
-		//		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
-		//		sendPacket.setAddress(clientIP);
-		//		sendPacket.setPort(clientPort);					
-		//		sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ACK");
-		//
-		//		// finish transfer
-		//		finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
-		//				ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);				
-		//
-		//		// end simulation
-		//		printEndSimulation();
-		//		return;
 	}
 
 	/**
