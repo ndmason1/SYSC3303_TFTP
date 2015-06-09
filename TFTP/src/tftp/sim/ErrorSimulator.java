@@ -1411,6 +1411,20 @@ public class ErrorSimulator {
 						return;
 					}
 					
+					if (packetTypeSelection == PacketType.DATA && currentBlockNum == 1 || 
+						packetTypeSelection == PacketType.ACK && currentBlockNum == 0) {
+						
+						// this case needs to be handled differently, see method description
+						handleRetransmitsFirstServerPacketDropped(numDrops, clientSendRecvSocket, packetTypeSelection);
+						
+						System.out.println("\nfinishing transfer...");
+						finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort,
+								ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID);
+						
+						printEndSimulation();
+						return;
+					}
+					
 					// deal with retransmissions from both sides resulting from lost packet	
 					if (startingRequestType == PacketType.RRQ) {
 						
@@ -2298,6 +2312,117 @@ public class ErrorSimulator {
 		System.out.println("\nsimulation complete.");
 		System.out.println("press enter to continue");
 		keyboard.nextLine(); 
+	}
+	
+	/**
+	 * Deal with retransmissions sent by the client and server as a result of the server's 
+	 * response (DATA 1 / ACK 0) to a request being dropped.
+	 * These cases must be handled separately since new sockets are required to simulate
+	 * multiple server threads being spawned.
+	 * 
+	 * @param droppedPackets				the number of packets that are dropped before this method is called
+	 * @param clientSendRecvSocket			the socket used to communicate with the client
+	 * @param droppedPacketType				the type of server response that is dropped (DATA or ACK)
+	 * @throws IllegalArgumentException		if dropped packets > 2 (3 allowed retransmissions so transfer is cancelled if all are dropped)  
+	 */
+	private void handleRetransmitsFirstServerPacketDropped(int droppedPackets, DatagramSocket clientSendRecvSocket, 
+			PacketType droppedPacketType) {
+		
+		if (droppedPackets > 2)
+			throw new IllegalArgumentException("Invalid argument: droppedPackets cannot exceed 2");
+		
+		System.out.println("\n\tGET AND SEND RETRANSMITS");
+		
+		PacketType reqType = droppedPacketType == PacketType.DATA ? PacketType.RRQ : PacketType.WRQ;
+		PacketType clientSendType = droppedPacketType == PacketType.DATA ? PacketType.ACK : PacketType.DATA;
+		
+		if (droppedPackets == 1) {
+			// get and send retransmitted server response
+			// this is done first so the first server thread created will finish the transfer
+			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, droppedPacketType.name());
+			
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
+			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+			
+			// get and send retransmitted request
+			receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, reqType.name());
+			
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);				
+			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+			
+			// create new socket to simulate new server TID
+			DatagramSocket unknownTIDSocket = null;
+			try {						
+				unknownTIDSocket = new DatagramSocket();
+			} catch (SocketException e1) {
+				e1.printStackTrace();
+			}
+			
+			// get and send second server response (from retransmitted request)
+			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, droppedPacketType.name());
+			int secondThreadTID = receivePacket.getPort(); 
+			
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
+			sendPacketToProcess(unknownTIDSocket, ProcessType.CLIENT, receivedPacketType.name());
+			
+			// receive client response from new socket (should be an ERROR with code 5)
+			receivePacketFromProcess(unknownTIDSocket, ProcessType.CLIENT, "ERROR");
+
+			// check result and display
+			printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_UNKNOWN_TID);
+			
+			// send ERROR to second server thread
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, secondThreadTID);				
+			sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+			
+			unknownTIDSocket.close();
+			
+		} else {
+
+			// get and send retransmitted server response
+			// this is done first so the first server thread created will finish the transfer
+			receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, droppedPacketType.name());
+
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
+			sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+
+			for (int i = 0; i < 2; i++) {
+				// get and send retransmitted request
+				receivePacketFromProcess(clientRecvSocket, ProcessType.CLIENT, reqType.name());
+	
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, Server.SERVER_PORT);				
+				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+	
+				// create new socket to simulate new server TID
+				DatagramSocket unknownTIDSocket = null;
+				try {						
+					unknownTIDSocket = new DatagramSocket();
+				} catch (SocketException e1) {
+					e1.printStackTrace();
+				}
+	
+				// get and send server response from retransmitted request
+				receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, droppedPacketType.name());
+				int secondThreadTID = receivePacket.getPort(); 
+	
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);				
+				sendPacketToProcess(unknownTIDSocket, ProcessType.CLIENT, receivedPacketType.name());
+	
+				// receive client response from new socket (should be an ERROR with code 5)
+				receivePacketFromProcess(unknownTIDSocket, ProcessType.CLIENT, "ERROR");
+	
+				// check result and display
+				printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_UNKNOWN_TID);
+	
+				// send ERROR to server thread
+				sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, secondThreadTID);				
+				sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+				
+				unknownTIDSocket.close();
+			}
+		}
+
+		// transfer should now be "caught up"
 	}
 
 	/**
