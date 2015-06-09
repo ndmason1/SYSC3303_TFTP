@@ -35,7 +35,6 @@ import tftp.exception.*;
  */
 public class Client {	 
 
-	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
 	//Private variables
 	private DatagramSocket sendReceiveSocket;
 	private DatagramPacket sendPacket, receivePacket;
@@ -154,19 +153,21 @@ public class Client {
         boolean packetReceived = false;
         int retransmission = 0;
         
-        while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
+        while (!packetReceived && retransmission <= PacketUtil.DEFAULT_RETRY_TRANSMISSION){
         	try {			  
         		receivePacket = PacketUtil.receivePacketOrTimeout("", sendReceiveSocket, ProcessType.SERVER, "DATA");
         		packetReceived = true;
-        		retransmission = 0;
         		
         	} catch(SocketTimeoutException ex){
-        		//no response received after 1 sec, resending
-        		// TODO  how to resend twice if no response again
-    			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-    				throw new TFTPException("Server does not respond, maximum number of retransmissions reached, aborting operation", PacketUtil.ERR_UNDEFINED);
-    			}
-    			System.out.println("Socket Timeout for response of request packet, resending...");
+        		
+        		System.out.println("Error: Timed out while waiting for DATA Packet");
+        		
+    			if (retransmission == PacketUtil.DEFAULT_RETRY_TRANSMISSION){
+    				throw new TFTPException(String.format("Could not reach server after %d retries, aborting request", 
+    						retransmission), PacketUtil.ERR_UNDEFINED);
+    			}    			
+
+        		System.out.println("possible RRQ packet loss, resending...");
     			
     			PacketUtil.sendPacketToProcess("", sendReceiveSocket, sendPacket, ProcessType.SERVER, "RRQ");
     			retransmission ++;
@@ -198,7 +199,7 @@ public class Client {
 		}
 		
 		// request is good, set up a receiver to proceed with the transfer
-		Receiver r = new Receiver(ProcessType.SERVER, sendReceiveSocket,targetIP, receivePacket.getPort());
+		Receiver r = new Receiver(ProcessType.SERVER, sendReceiveSocket, targetIP, receivePacket.getPort());
 		r.receiveFile(receivePacket, getFile());
 	}
 
@@ -217,23 +218,21 @@ public class Client {
         boolean packetReceived = false;
         int retransmission = 0;
         
-        while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
+        while (!packetReceived && retransmission <= PacketUtil.DEFAULT_RETRY_TRANSMISSION){
         	try {			  
         		receivePacket = PacketUtil.receivePacketOrTimeout("", sendReceiveSocket, ProcessType.SERVER, "ACK");
         		packetReceived = true;
-        		retransmission = 0;
         		
         	} catch(SocketTimeoutException ex){
-        		//no response received after 1 sec, resending
-        		// TODO  how to resend twice if no response again
         		
-    			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-    				throw new TFTPException(String.format("Could not reach server after %d retries, aborting request", 
-    						retransmission), PacketUtil.ERR_UNDEFINED);
-    				
-    			}
+        		System.out.println("Error: Timed out while waiting for DATA Packet");		
+        		
+    			if (retransmission == PacketUtil.DEFAULT_RETRY_TRANSMISSION){
+    				throw new TFTPException(String.format("No response received after %d retries, aborting request", 
+    						retransmission), PacketUtil.ERR_UNDEFINED);    				
+    			}    			
 
-    			System.out.println("Socket Timeout for response of request packet, resending...");
+        		System.out.println("possible WRQ packet loss, resending...");        
     			
     			PacketUtil.sendPacketToProcess("", sendReceiveSocket, sendPacket, ProcessType.SERVER, "WRQ");	
     			retransmission ++;

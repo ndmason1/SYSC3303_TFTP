@@ -20,6 +20,8 @@ public class PacketUtil {
 	private InetAddress receiverIP;
 	private int receiverPort;
 	
+	public final static int DEFAULT_RETRY_TRANSMISSION = 2;
+	
 	public final static byte READ_FLAG = 0x01;
 	public final static byte WRITE_FLAG = 0x02;
 	public final static byte ACK_FLAG = 0x04;

@@ -11,6 +11,7 @@ package tftp.server.thread;
 import java.io.File;
 import java.net.DatagramPacket;
 import java.net.SocketTimeoutException;
+import java.util.Arrays;
 
 import tftp.exception.ErrorReceivedException;
 import tftp.exception.TFTPException;
@@ -24,7 +25,6 @@ import tftp.net.Receiver;
  */
 public class WriteHandlerThread extends WorkerThread {
 	
-	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
 	private String directory;	
 	
 	/**
@@ -98,24 +98,29 @@ public class WriteHandlerThread extends WorkerThread {
 
         	boolean packetReceived = false;
         	int retransmission = 0;
+        	
+        	while (!packetReceived && retransmission <= PacketUtil.DEFAULT_RETRY_TRANSMISSION){
 
-        	while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){ 
         		try {
-        			if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-        				printToConsole("Can not complete sending Request, terminated");
-        				return;
-        			}
-
-        			receivePacket = PacketUtil.receivePacketOrTimeout(getName()+": ", sendReceiveSocket, ProcessType.CLIENT, "DATA");		        
+        			receivePacket = PacketUtil.receivePacketOrTimeout(getName()+": ", sendReceiveSocket, ProcessType.CLIENT, "DATA");
         			packetReceived = true;
-        			retransmission = 0;
 
-        		} catch (SocketTimeoutException socketTimeoutException) {
-        			printToConsole("Error Socket Timeout occured retrieving DATA packet");
+        		} catch(SocketTimeoutException e){
+
+        			printToConsole("Error: Timed out while waiting for DATA Packet");
+
+        			if (retransmission == PacketUtil.DEFAULT_RETRY_TRANSMISSION){
+        				System.out.println("Maximum retries reached with no response");
+        				System.out.println("Can not complete transfer");
+        				return;
+        			}					
+
+        			printToConsole("possible ACK packet loss, resending...");
         			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, initAck, ProcessType.CLIENT, "ACK");
+        			
         			retransmission++;
-        			return;
         		}
+
         	}
         
 	        // parse the first DATA packet to ensure it is correct before continuing

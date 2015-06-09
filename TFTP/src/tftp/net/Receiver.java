@@ -16,7 +16,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 
 import tftp.exception.ErrorReceivedException;
@@ -25,8 +24,7 @@ import tftp.server.thread.WorkerThread;
 
 
 public class Receiver
-{    
-	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
+{
 
 	private DatagramSocket socket;
 
@@ -58,10 +56,13 @@ public class Receiver
 		threadLabel = ownerThread.getName() + ": ";
 	}
 
+
+	// return false if transfer didn't finish normally
+	// initPacket is first DATA packet
 	public void receiveFile(DatagramPacket initPacket, File aFile) throws TFTPException {
 
 		int blockNum = 1;
-		int oldBlockNum = 1;
+//		int oldBlockNum = 1;
 		boolean duplicatePacket = false;
 		
 		createFile(aFile);
@@ -82,13 +83,13 @@ public class Receiver
 		while (!done) {
 			
 			// expect next DATA to have increased block number
-			oldBlockNum = blockNum;
+			//oldBlockNum = blockNum;
 			blockNum++;
 
 			boolean packetReceived = false;
 			int retransmission = 0;
 
-			while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
+			while (!packetReceived && retransmission <= PacketUtil.DEFAULT_RETRY_TRANSMISSION){
 				
 				// zero the receive buffer so no lingering data is detected
 				Arrays.fill(data, (byte)0);
@@ -99,16 +100,18 @@ public class Receiver
 					
 				} catch(SocketTimeoutException e){
 					
-					printToConsole("Error: Response data packet not received, last ack packet may lost, resending...");
+					printToConsole("Error: Timed out while waiting for DATA Packet");
 					
-					if (retransmission == DEFAULT_RETRY_TRANSMISSION){
-						System.out.println("Can not complete tranfer file, terminated");
-						return;
-					}
-					if (!duplicatePacket) {
-						PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, senderProcess, "ACK");
-						retransmission++;
-					} 
+					if (retransmission == PacketUtil.DEFAULT_RETRY_TRANSMISSION){
+						closeFileWriter(fileWriter);
+						throw new TFTPException(String.format("No response received after %d retries, aborting request", 
+        						retransmission), PacketUtil.ERR_UNDEFINED);
+					}					
+
+	        		printToConsole("possible ACK packet loss, resending...");
+					
+					PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, senderProcess, "ACK");
+					retransmission++;
 				}
 			
 			}
@@ -134,20 +137,20 @@ public class Receiver
 				PacketUtil.sendPacketToProcess(threadLabel, socket, errPacket, senderProcess, "ERROR");
 				
 				// keep going if error was unknown TID
-				// otherwise, rethrow so the client UI can print a message
 				if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-					oldBlockNum--;
-					blockNum--;
+	        		printToConsole("received packet with unknown TID");	        		
+	        		blockNum--;
 					continue;
-				}
-				else
-					throw e;
+	        	} else {
+	        		// rethrow so the owner of this Sender knows whats up
+	        		throw e;
+	        	}
 			}
 
 			// If duplicate data packet we will not write to file
 			if (duplicatePacket){
-				blockNum = oldBlockNum;
-				
+				//blockNum = oldBlockNum;
+				blockNum--;
 			} else {
 				
 				checkDiskFull(aFile, receivePacket); // First check if disk is full

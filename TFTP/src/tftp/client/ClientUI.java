@@ -150,7 +150,6 @@ public class ClientUI {
 		client.setMode("octet");
 		
 		client.retreiveFile();
-
 		
 		if (type.equals("r")) {
 			// read request
@@ -174,8 +173,9 @@ public class ClientUI {
 			} catch (TFTPException e) {				
 				System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());				
 				System.out.println("Could not complete request, please try again.");
-				return;
-			}
+				return;			
+			}			
+			
 			System.out.println("Read of file " + client.getFilename() + " into directory " + client.getDirectory() + " finished.\n");
 			
 		} else if (type.equals("w")) {
@@ -194,17 +194,18 @@ public class ClientUI {
 				return;
 			}
 			
-			try{
+			try {
 			    client.sendWriteRequest();
-			}catch (TFTPException e){
+			} catch (TFTPException e){
 				if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID) {
 					System.out.println("ERROR: (" + e.getErrorCode() + ")" + " " + e.getMessage());
 					System.out.println("Could not complete request, please try again.");
 					return;
 				}
 			}
-			
+						
 			System.out.println("Write of file " + client.getFilename() + " from directory " + client.getDirectory() + " finished.\n");
+			
 		} else {
 			System.out.println("Invalid request type.");
 			printHelp();

@@ -16,7 +16,6 @@ import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.SocketTimeoutException;
-import java.net.UnknownHostException;
 import java.util.Arrays;
 
 import tftp.exception.ErrorReceivedException;
@@ -24,8 +23,6 @@ import tftp.exception.TFTPException;
 import tftp.server.thread.WorkerThread;
 
 public class Sender {
-	
-	private final static int DEFAULT_RETRY_TRANSMISSION = 3;
 
 	private FileInputStream fileReader;
 	private DatagramSocket socket;
@@ -55,6 +52,7 @@ public class Sender {
 		threadLabel = ownerThread.getName() + ": ";
 	}
 
+	// return false if transfer didn't finish normally
 	public void sendFile(File theFile) throws TFTPException {
 		
 		try {
@@ -96,53 +94,51 @@ public class Sender {
 			boolean packetReceived = false;
 	        int retransmission = 0;
 	        
-	        // expect ACK
-	        while (!packetReceived && retransmission <= DEFAULT_RETRY_TRANSMISSION){
+	        // expect ACK	        
+	        while (!packetReceived && retransmission <= PacketUtil.DEFAULT_RETRY_TRANSMISSION){
 	        	try {
 	        		reply = PacketUtil.receivePacketOrTimeout(threadLabel, socket, receiverProcess, "ACK");
 	        		packetReceived = true;
-	        		retransmission = 0;
 	        		
 	        	} catch (SocketTimeoutException ex){
 	        		//no response for last Data packet, Data packet maybe lost, resending...
-	        		printToConsole("Error: Timed out retreiving ACK Packet, Possible data packet loss, resending...");
+	        		printToConsole("Error: Timed out while waiting for ACK Packet");	        		
 	    			
-    				if (retransmission == DEFAULT_RETRY_TRANSMISSION){
+    				if (retransmission == PacketUtil.DEFAULT_RETRY_TRANSMISSION){
     					
-    					System.out.println("Can not complete sending Request, terminated");
-    					return;
-    				}
-    				System.out.println(sendPacket);
-    				if (!duplicatePacket){
-    					PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, receiverProcess, "DATA");
-    				}
+    					throw new TFTPException(String.format("No response received after %d retries, aborting request", 
+        						retransmission), PacketUtil.ERR_UNDEFINED);   
+    				}    				
+    				
+    				printToConsole("possible DATA packet loss, resending...");
+    				PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, receiverProcess, "DATA");
 					retransmission++;
-	        	}   
+	        	}
+	        }
 	        
 
-	        	// parse ACK to ensure it is correct before continuing
-	        	try {
-	        		duplicatePacket = parser.parseAckPacket(reply, blockNum);
-	        	} catch (ErrorReceivedException e) {
-	        		// the other side sent an error packet, don't send a response				
+	        // parse ACK to ensure it is correct before continuing
+	        try {
+	        	duplicatePacket = parser.parseAckPacket(reply, blockNum);
+	        } catch (ErrorReceivedException e) {
+	        	// the other side sent an error packet, don't send a response				
+	        	// rethrow so the owner of this Sender knows whats up
+	        	throw e;
+
+	        } catch (TFTPException e) {
+
+	        	// send error packet
+	        	DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+	        			reply.getAddress(), reply.getPort());				
+	        	PacketUtil.sendPacketToProcess(threadLabel, socket, errPacket, receiverProcess, "ERROR");
+
+	        	if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+	        		printToConsole("received packet with unknown TID");
+	        		// consider unknown TID a duplicate packet so we still wait for the right ACK
+	        		duplicatePacket = true;
+	        	} else {
 	        		// rethrow so the owner of this Sender knows whats up
 	        		throw e;
-
-	        	} catch (TFTPException e) {
-
-	        		// send error packet
-	        		DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-	        				reply.getAddress(), reply.getPort());				
-	        		PacketUtil.sendPacketToProcess(threadLabel, socket, errPacket, receiverProcess, "ERROR");
-
-	        		if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-	        			printToConsole("received packet with unknown TID");
-	        			// consider unknown TID a duplicate packet so we still wait for the right ACK
-	        			duplicatePacket = true;
-	        		} else {
-	        			// rethrow so the owner of this Sender knows whats up
-	        			throw e;
-	        		}
 	        	}
 	        }
 			

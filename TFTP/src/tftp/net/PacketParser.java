@@ -141,6 +141,7 @@ public class PacketParser {
 	 * Parses an ACK packet.
 	 *
 	 * @param  packet	the packet containing an ACK in response to a data block
+	 * @return			true if packet is a duplicate (previously seen block number)
 	 * @throws 			TFTPPacketException if the packet is badly formatted/corrupted 
 	 */
 	public boolean parseAckPacket(DatagramPacket packet, int expectedBlockNum) throws TFTPException {
