@@ -23,6 +23,8 @@ import tftp.exception.TFTPException;
 import tftp.server.thread.WorkerThread;
 
 public class Sender {
+	
+	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
 
 	private FileInputStream fileReader;
 	private DatagramSocket socket;
@@ -116,7 +118,6 @@ public class Sender {
 	        	}
 	        }
 	        
-
 	        // parse ACK to ensure it is correct before continuing
 	        try {
 	        	duplicatePacket = parser.parseAckPacket(reply, blockNum);
@@ -141,7 +142,8 @@ public class Sender {
 	        		throw e;
 	        	}
 	        }
-			
+
+
 			if (!duplicatePacket) { blockNum++; }
 
 		} while (!done);
