@@ -25,7 +25,7 @@ import tftp.server.thread.WorkerThread;
 
 public class Sender {
 	
-	private final static int DEFAULT_RETRY_TRANSMISSION = 3;
+	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
 
 	private FileInputStream fileReader;
 	private DatagramSocket socket;
