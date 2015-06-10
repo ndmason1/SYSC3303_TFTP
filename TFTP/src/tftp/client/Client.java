@@ -124,7 +124,7 @@ public class Client {
 
 		//Checking if the file exists
 		if (!getFile().exists()){
-			String msg = "CLIENT: FILE NOT FOUND(" + filename +") IN THE DIRECTORY\n" + getDirectory();
+			String msg = "CLIENT: FILE(" + filename +") NOT FOUND IN THE DIRECTORY\n" + getDirectory();
 			
 			throw new TFTPException(msg, PacketUtil.ERR_FILE_NOT_FOUND);
 

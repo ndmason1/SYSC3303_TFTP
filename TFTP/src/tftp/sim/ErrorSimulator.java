@@ -184,7 +184,7 @@ public class ErrorSimulator {
 			break;
 
 		case PACKET_DUPLICATE:
-			showPacketTypeMenu(message);
+			showDuplicateMenu(message);
 			break;
 
 		case PACKET_LOST:
@@ -200,6 +200,26 @@ public class ErrorSimulator {
 		}
 	} 
 
+	private void showDuplicateMenu(String message){
+		System.out.println(message);
+		
+		if(receiverProcessSelection == ProcessType.SERVER){
+			System.out.println("\n(1) WRQ");
+			packetTypeSelection = PacketType.WRQ;
+		}else{
+			System.out.println("\n(1) RRQ");
+			packetTypeSelection = PacketType.RRQ;
+		}
+		
+		int selection = getMenuInput();
+		while (selection != 1){
+			selection = getMenuInput();
+		}
+		
+		showBlockNumberPrompt(packetTypeSelection.name() + " selected as packet to duplicate.");
+		simulateDuplicatePacket();
+		
+	}
 	/**
 	 * Displays a menu for the user to select a type of packet that should be modified.
 	 * Currently only used for illegal operation mode.
@@ -1755,7 +1775,7 @@ public class ErrorSimulator {
 	private void simulateDuplicatePacket() {
 	
 		// prompt for number of times to send duplicate
-		System.out.println("Please enter the number of times the chosen packet should get duplicated (1-99):\n");	
+		System.out.println("Please enter the number of times the chosen packet should get duplicated (1-3):\n");	
 		String input = null;
 	
 		do {
@@ -1764,15 +1784,15 @@ public class ErrorSimulator {
 			if (input.toLowerCase().charAt(0) == 'q')
 				quit();
 	
-		} while (!input.matches("[1-9]|[1-9][0-9]")); // keep looping until max 2 digit number entered 
+		} while (!input.matches("[1-3]")); // keep looping until max 2 digit number entered 
 	
 		int numDups = Integer.parseInt(input);
 		
 		System.out.println("\nChosen parameters for duplicated packet simulation: ");
 		System.out.println("Process to receive duplicated packet: " + receiverProcessSelection.name());
 		System.out.println("Packet type to duplicated: " + packetTypeSelection.name());
-		if (packetTypeSelection == PacketType.DATA || packetTypeSelection == PacketType.ACK)
-			System.out.println("Block number of chosen packet: " + blockNumSelection);
+	
+		System.out.println("Block number of chosen packet: " + blockNumSelection);
 		System.out.printf("Number of duplicates sent: %d\n\n", numDups);
 	
 		System.out.println("==== EXECUTING SIMULATION ====\n");
@@ -1798,12 +1818,7 @@ public class ErrorSimulator {
 			System.out.println("terminating simulation");
 			return;
 		}
-		
-		PacketType serverSendType = startingRequestType == PacketType.RRQ ? 
-				PacketType.DATA : PacketType.ACK ;
-		PacketType clientSendType = startingRequestType == PacketType.RRQ ? 
-				PacketType.ACK : PacketType.DATA ;
-	
+
 		// set up a new socket to send server packets to the client
 		DatagramSocket clientSendRecvSocket = null;
 		try {
@@ -1834,66 +1849,182 @@ public class ErrorSimulator {
 				System.arraycopy(receivePacket.getData(), 0, originalReqData, 0, originalReqLength);
 				
 				int originalServerTID = 0;
-	
-				for (int i = 0; i <= numDups; i++) {
+				
+				if (receivedPacketType == PacketType.RRQ){
 					
-					if (i > 0) System.out.printf("\n\tDuplicate %d\n", i);
-					// send the request packet
 					sendPacket = new DatagramPacket(originalReqData, originalReqLength, serverIP, Server.SERVER_PORT);
-					sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, originalReqType.name());
+					try {
+						serverSendRecvSocket.send(sendPacket);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 					
-					// receive response
-					receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, serverSendType.name());					 
-					int serverTID = receivePacket.getPort();
 					
-					if (i > 0) {
-						// create new socket to simulate new server TID
-						DatagramSocket unknownTIDSocket = null;
-						try {						
-							unknownTIDSocket = new DatagramSocket();
-						} catch (SocketException e1) {
-							e1.printStackTrace();
-						}
-						
-						// send to client from new TID
-						sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
-						sendPacketToProcess(unknownTIDSocket, ProcessType.CLIENT, receivedPacketType.name());
-						
-						// get client response (should be ERROR 5)
-						receivePacketFromProcess(unknownTIDSocket, ProcessType.CLIENT, "ERROR");
-						
-						// check result
-						printSimulationResult(ProcessType.CLIENT, PacketUtil.ERR_UNKNOWN_TID);
-						
-						// send error 5 to server (new packet in case the client didn't actually send ERROR 5)
-						// this is so server threads know to quit
-						PacketUtil packetUtil = new PacketUtil(serverIP, serverTID);
-						sendPacket = packetUtil.formErrorPacket(PacketUtil.ERR_UNKNOWN_TID, 
-								"received packet from unrecognized source port");
-						sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "ERROR");
-						
-					} else {
-						originalServerTID = serverTID;						
-						
-						// send first server response to client (so server TID is set)						
-						sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
+					while(true){
+
+						// start by listening for a packet from the process whose "turn" it is
+						receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ERROR");
+						originalServerTID = receivePacket.getPort();
+						// send received packet to other side		
+						sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+								clientIP, clientPort);
 						sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
-						
-						// get client DATA/ACK and send to server
-						receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, clientSendType.name());
-												
-						sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, serverTID);
+
+						// check to see if the last packet sent will end the transfer
+						if (isTerminatingErrorPacket(receivePacket)) {
+							// the error packet was sent to the host and no response is expected
+							return;
+						} else if (isFinalDataPacket(receivePacket)) {
+
+							// expect a final ACK, but could also be ERROR				
+							receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "ACK/ERROR");
+
+							// pass on the ACK or ERROR
+							sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+									serverIP, originalServerTID);
+							sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+
+							// we're done
+							return;		
+						}
+
+						// last packet sent was not terminating error or final data, so do the same for process B
+
+						receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "ACK/ERROR");
+
+						if(receivePacket.getData()[3] == blockNumSelection){
+							for (int i = 0; i < numDups; i++){
+								receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ERROR");
+								if (receivePacket.getData()[3] == blockNumSelection){
+									System.out.println("================================================================");
+									System.out.printf("\nDuplicate Data Packet %d times received with Block number %d\n", i+1, receivePacket.getData()[3]);
+									System.out.println("================================================================");
+								}else{
+									System.out.println("Duplicate Data Packet Test Failed");
+									printEndSimulation();
+									clientSendRecvSocket.close();
+									return;
+								}
+								sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+										clientIP, clientPort);
+								sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+								
+								receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "ACK/ERROR");
+							}
+							sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+									serverIP, originalServerTID);
+							sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+							
+							finishTransfer(ProcessType.SERVER, serverSendRecvSocket, serverIP, originalServerTID, 
+									ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort);
+							System.out.println("Finished Test, Duplicate Data Packet Test Success");
+							printEndSimulation();
+							clientSendRecvSocket.close();
+							return;
+						}
+						// send received packet to other side		
+						sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+								serverIP, originalServerTID);
 						sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
-						
+
+						// check to see if the last packet sent will end the transfer
+						if (isTerminatingErrorPacket(receivePacket)) {
+							// the error packet was sent to the host and no response is expected
+							return;
+						}
+
+						// still not the end of the transfer -> next loop iteration
+					
 					}
 				}
-	
+				
+				if(receivedPacketType == PacketType.WRQ){
+					sendPacket = new DatagramPacket(originalReqData, originalReqLength, serverIP, Server.SERVER_PORT);
+					try {
+						serverSendRecvSocket.send(sendPacket);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+					
+					
+					while(true){
+
+						// start by listening for a packet from the process whose "turn" it is
+						receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ACK/ERROR");
+						originalServerTID = receivePacket.getPort();
+						// send received packet to other side		
+						if(receivePacket.getData()[3] == blockNumSelection){
+							for (int i = 0; i < numDups; i++){
+								receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ERROR");
+								if (receivePacket.getData()[3] == blockNumSelection){
+									System.out.println("================================================================");
+									System.out.printf("\nDuplicate Data Packet %d times received with Block number %d\n", i+1, receivePacket.getData()[3]);
+									System.out.println("================================================================");
+								}else{
+									System.out.println("Duplicate Data Packet Test Failed");
+									printEndSimulation();
+									clientSendRecvSocket.close();
+									return;
+								}
+								sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+										serverIP, originalServerTID);
+								sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+								
+								receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ACK/ERROR");
+							}
+							sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+									clientIP, clientPort);
+							sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+							
+							finishTransfer(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+									ProcessType.SERVER, serverSendRecvSocket, serverIP, originalServerTID);
+							System.out.println("Finished Test, Duplicate Data Packet Test Success");
+							printEndSimulation();
+							clientSendRecvSocket.close();
+							return;
+						}
+						
+						sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+								clientIP, clientPort);
+						sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, receivedPacketType.name());
+
+						// check to see if the last packet sent will end the transfer
+						if (isTerminatingErrorPacket(receivePacket)) {
+							// the error packet was sent to the host and no response is expected
+							return;
+						} else if (isFinalDataPacket(receivePacket)) {
+
+							// expect a final ACK, but could also be ERROR				
+							receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ERROR");
+
+							// pass on the ACK or ERROR
+							sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+									serverIP, originalServerTID);
+							sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+
+							// we're done
+							return;		
+						}
+
+						// last packet sent was not terminating error or final data, so do the same for process B
+
+						receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ERROR");
+
+						sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), 
+								serverIP, originalServerTID);
+						
+						sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, receivedPacketType.name());
+						
+					
+					}
+					
+				}
 				System.out.println("\n\tfinishing transfer");
 				
 				// finish transfer
-				finishTransfer(ProcessType.SERVER, serverSendRecvSocket, serverIP, originalServerTID,
-						ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort);				
-	
+
 				// end simulation
 				printEndSimulation();
 				clientSendRecvSocket.close();
@@ -2179,6 +2310,7 @@ public class ErrorSimulator {
 			label += " " + PacketUtil.getErrorCode(receivePacket);
 
 		System.out.printf("  received %s packet ", label);
+	//	System.out.println(receivePacket.getData()[2] + "," + receivePacket.getData()[3]);
 		PacketUtil.printOpcodeAndLength(receivePacket);
 	}
 

@@ -119,33 +119,34 @@ public class Sender {
 					retransmission++;
 	        	}   
 	        
+	        }
+	        // parse ACK to ensure it is correct before continuing
+	        try {
 
-	        	// parse ACK to ensure it is correct before continuing
-	        	try {
-	        		duplicatePacket = parser.parseAckPacket(reply, blockNum);
-	        	} catch (ErrorReceivedException e) {
-	        		// the other side sent an error packet, don't send a response				
+	        	duplicatePacket = parser.parseAckPacket(reply, blockNum);
+	        } catch (ErrorReceivedException e) {
+	        	// the other side sent an error packet, don't send a response				
+	        	// rethrow so the owner of this Sender knows whats up
+	        	throw e;
+
+	        } catch (TFTPException e) {
+
+	        	// send error packet
+	        	DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
+	        			reply.getAddress(), reply.getPort());				
+	        	PacketUtil.sendPacketToProcess(threadLabel, socket, errPacket, receiverProcess, "ERROR");
+
+	        	if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
+	        		printToConsole("received packet with unknown TID");
+	        		// consider unknown TID a duplicate packet so we still wait for the right ACK
+	        		duplicatePacket = true;
+	        	} else {
 	        		// rethrow so the owner of this Sender knows whats up
 	        		throw e;
-
-	        	} catch (TFTPException e) {
-
-	        		// send error packet
-	        		DatagramPacket errPacket = packetUtil.formErrorPacket(e.getErrorCode(), e.getMessage(),
-	        				reply.getAddress(), reply.getPort());				
-	        		PacketUtil.sendPacketToProcess(threadLabel, socket, errPacket, receiverProcess, "ERROR");
-
-	        		if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID) {
-	        			printToConsole("received packet with unknown TID");
-	        			// consider unknown TID a duplicate packet so we still wait for the right ACK
-	        			duplicatePacket = true;
-	        		} else {
-	        			// rethrow so the owner of this Sender knows whats up
-	        			throw e;
-	        		}
 	        	}
 	        }
-			
+
+
 			if (!duplicatePacket) { blockNum++; }
 
 		} while (!done);
