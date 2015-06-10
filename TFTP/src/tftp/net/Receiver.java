@@ -62,7 +62,6 @@ public class Receiver
 	public void receiveFile(DatagramPacket initPacket, File aFile) throws TFTPException {
 
 		int blockNum = 1;
-//		int oldBlockNum = 1;
 		boolean duplicatePacket = false;
 		
 		createFile(aFile);
@@ -83,7 +82,6 @@ public class Receiver
 		while (!done) {
 			
 			// expect next DATA to have increased block number
-			//oldBlockNum = blockNum;
 			blockNum++;
 
 			boolean packetReceived = false;
@@ -149,7 +147,6 @@ public class Receiver
 
 			// If duplicate data packet we will not write to file
 			if (duplicatePacket){
-				//blockNum = oldBlockNum;
 				blockNum--;
 			} else {
 				
@@ -163,9 +160,26 @@ public class Receiver
 			}
 			
 			// blockNum is verified, sending old block num if duplication of packet occured
-			sendPacket = packetUtil.formAckPacket(blockNum);			
+			sendPacket = packetUtil.formAckPacket(blockNum);
 			PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, senderProcess, "ACK");
 			
+			if (done) {
+				
+				// listen for retransmitted DATA in case final ACK was lost
+				try {
+					receivePacket = PacketUtil.receivePacketOrTimeout(threadLabel, socket, senderProcess, "DATA");
+					packetReceived = true;
+					
+					// if DATA, resend final ACK
+					if (PacketUtil.getPacketType(receivePacket) == PacketType.DATA) {
+						sendPacket = packetUtil.formAckPacket(blockNum);
+						PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, senderProcess, "ACK");
+					}
+					
+				} catch(SocketTimeoutException e){
+					// finish
+				}			
+			}			
 		}
 		
 		closeFileWriter(fileWriter);
