@@ -54,6 +54,8 @@ public abstract class WorkerThread extends Thread {
 	protected static int id = 1;
 	
 	protected String directory;
+	
+	protected LockCollection lock; 
 	/**
 	 * Constructs a WorkerThread. 
 	 *
@@ -65,6 +67,8 @@ public abstract class WorkerThread extends Thread {
 		clientIP = reqPacket.getAddress();
 		clientPort = reqPacket.getPort();
 		setDefaultTimeout(ErrorSimulator.TIMEOUT_MS);
+		
+		lock = LockCollection.getInstance();
 
 		try {
 			sendReceiveSocket = new DatagramSocket();

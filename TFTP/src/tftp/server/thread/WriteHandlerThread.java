@@ -70,8 +70,18 @@ public class WriteHandlerThread extends WorkerThread {
 			
 			printToConsole("request cannot be processed, ending this thread");			
 			return;
-		}			
-	
+		}
+		
+		if(lock.isWriteLock(filename) || lock.isReadLock(filename)){
+			printToConsole(String.format("ERROR: (%d) %s\n", PacketUtil.ERR_ACCESS_VIOLATION, "ACCESS VIOLATION, File is locked, can not access"));
+			// send error packet
+			DatagramPacket errPacket = packetUtil.formErrorPacket(PacketUtil.ERR_ACCESS_VIOLATION, "ACCESS VIOLATION, File is locked, can not access");
+			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, errPacket, ProcessType.CLIENT, "ERROR");
+			return;
+		}
+				
+		lock.addWriter(filename);
+			
 		File f = new File(getDirectory().concat("\\" + filename));
 		
 		if(f.exists() && !f.canWrite()){    // no write access
@@ -82,7 +92,8 @@ public class WriteHandlerThread extends WorkerThread {
 			error.setPort(reqPacket.getPort());		
 
 			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, error, ProcessType.CLIENT, "ERROR");			   
-			sendReceiveSocket.close();			   
+			sendReceiveSocket.close();
+			lock.deleteWriter(filename);
 			return;
 		}
 
@@ -112,6 +123,7 @@ public class WriteHandlerThread extends WorkerThread {
         			if (retransmission == PacketUtil.DEFAULT_RETRY_TRANSMISSION){
         				System.out.println("Maximum retries reached with no response");
         				System.out.println("Can not complete transfer");
+        				lock.deleteWriter(filename);
         				return;
         			}					
 
@@ -131,6 +143,7 @@ public class WriteHandlerThread extends WorkerThread {
 	        	// the other side sent an error packet, don't send a response        	
 	        	printToConsole("ERROR packet received from client!");		
 	        	printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
+	        	lock.deleteWriter(filename);
 				return;        	
 	
 	        } catch (TFTPException e) {
@@ -146,8 +159,10 @@ public class WriteHandlerThread extends WorkerThread {
 	        	// otherwise, rethrow so the client UI can print a message
 	        	if (e.getErrorCode() == PacketUtil.ERR_UNKNOWN_TID)
 	        		continue;
-	        	else 
+	        	else {
+	        		lock.deleteWriter(filename);
 	        		return;
+	        	}
 	        }
 	        
 	        // if we get here, DATA 1 is good
@@ -161,7 +176,8 @@ public class WriteHandlerThread extends WorkerThread {
 			printToConsole("Finished write request for file: " + f.getName());
 		} catch (TFTPException e) {
 			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
-		} finally {		
+		} finally {
+			lock.deleteWriter(filename);
 			cleanup();
 		}
 	}

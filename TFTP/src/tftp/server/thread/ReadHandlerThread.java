@@ -60,6 +60,18 @@ public class ReadHandlerThread extends WorkerThread {
 			return;
 		}
 		
+		if(lock.isWriteLock(filename)){
+			printToConsole(String.format("ERROR: (%d) %s\n", PacketUtil.ERR_ACCESS_VIOLATION, "ACCESS VIOLATION, File is locked, can not access"));
+			// send error packet
+			DatagramPacket errPacket = packetUtil.formErrorPacket(PacketUtil.ERR_ACCESS_VIOLATION, "ACCESS VIOLATION, File is locked, can not access");
+			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, errPacket, ProcessType.CLIENT, "ERROR");
+			return;
+		}
+		
+		if (!lock.isReadLock(filename)){
+			lock.addReader(filename);
+		}
+		
 		//\\//\\//\\ File Not Found - Error Code 1 //\\//\\//\\
 
 		//Opens an input stream
@@ -76,7 +88,8 @@ public class ReadHandlerThread extends WorkerThread {
 			
 			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, error, ProcessType.CLIENT, "ERROR");
 			
-			cleanup();			   
+			cleanup();
+			lock.deleteReader(filename);
 			return;
 		}
 		
@@ -89,7 +102,8 @@ public class ReadHandlerThread extends WorkerThread {
 
 			PacketUtil.sendPacketToProcess(getName()+": ", sendReceiveSocket, error, ProcessType.CLIENT, "ERROR");			
 			
-			cleanup();			   
+			cleanup();	
+			lock.deleteReader(filename);
 			return;
 		}
 		
@@ -103,9 +117,12 @@ public class ReadHandlerThread extends WorkerThread {
 			printToConsole(String.format("ERROR: (%d) %s\n", e.getErrorCode(), e.getMessage()));
 			if (e.getErrorCode() != PacketUtil.ERR_UNKNOWN_TID) {
 				cleanup();
+				lock.deleteReader(filename);
 				return;
 			}
 		}
+		
+		lock.deleteReader(filename);
 		
 		cleanup();
 
