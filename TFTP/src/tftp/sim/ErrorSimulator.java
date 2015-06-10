@@ -77,11 +77,7 @@ public class ErrorSimulator {
 			System.out.println("Can not set IP address, terminated");
 			return;
 		}
-
-
-
-
-
+		
 		System.out.println("==== TFTP ERROR SIMULATOR STARTED ====\n");
 
 		// print IP (useful for iteration 5)
@@ -1429,7 +1425,7 @@ public class ErrorSimulator {
 					if (startingRequestType == PacketType.RRQ) {
 						
 						// client send ACK, server send DATA
-						getAndSendDroppedPacketRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+						handleDroppedPacketRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
 								ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, numDrops, packetTypeSelection);
 						
 						System.out.println("finishing transfer...");
@@ -1438,7 +1434,7 @@ public class ErrorSimulator {
 					} else { // WRQ
 						
 						// client send DATA, server send ACK
-						getAndSendDroppedPacketRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
+						handleDroppedPacketRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
 								ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, numDrops, packetTypeSelection);
 						
 						System.out.println("\nfinishing transfer...");
@@ -1514,7 +1510,7 @@ public class ErrorSimulator {
 					if (startingRequestType == PacketType.RRQ) {
 						
 						// client send ACK, server send DATA
-						getAndSendDroppedPacketRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
+						handleDroppedPacketRetransmits(ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, 
 								ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, numDrops, packetTypeSelection);
 						
 						System.out.println("finishing transfer...");
@@ -1523,7 +1519,7 @@ public class ErrorSimulator {
 					} else { // WRQ
 						
 						// client send DATA, server send ACK
-						getAndSendDroppedPacketRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
+						handleDroppedPacketRetransmits(ProcessType.SERVER, serverSendRecvSocket, serverIP, serverTID, 
 								ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort, numDrops, packetTypeSelection);
 						
 						System.out.println("\nfinishing transfer...");
@@ -2443,7 +2439,7 @@ public class ErrorSimulator {
 	 *  @param droppedPacketType  			the type of packet being dropped
 	 *  @throws IllegalArgumentException	if dropped packets > 2 (3 allowed retransmissions so transfer is cancelled if all are dropped)
 	 */
-	private void getAndSendDroppedPacketRetransmits(ProcessType ackProcess, DatagramSocket ackSocket, InetAddress ackAddr, int ackPort,
+	private void handleDroppedPacketRetransmits(ProcessType ackProcess, DatagramSocket ackSocket, InetAddress ackAddr, int ackPort,
 			ProcessType dataProcess, DatagramSocket dataSocket, InetAddress dataAddr, int dataPort, int droppedPackets, 
 			PacketType droppedPacketType) {
 		
@@ -2471,6 +2467,72 @@ public class ErrorSimulator {
 		
 		if ( (droppedPacketType == PacketType.ACK && droppedPackets == 1) ||
 			  droppedPacketType == PacketType.DATA) {
+
+			// get retransmitted ACK
+			receivePacketFromProcess(ackSocket, ackProcess, "retransmitted ACK");			
+	
+			// send retransmitted ACK (should be ignored)
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), dataAddr, dataPort);
+			sendPacketToProcess(dataSocket, dataProcess, "retransmitted ACK");
+		}
+
+		// get ACK from retransmitted DATA
+		receivePacketFromProcess(ackSocket, ackProcess, "ACK");
+
+		// send ACK from retransmitted DATA (shouldn't be ignored)
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), dataAddr, dataPort);
+		sendPacketToProcess(dataSocket, dataProcess, "ACK");
+
+
+		// transfer should now be "caught up"
+	}
+	
+	/**
+	 * Deal with retransmissions sent by the client and server as a result of dropped packet(s).
+	 * Note that this method only works for dropped DATA/ACK packets, and only if the dropped packets 
+	 * are NOT the first server response to a request (in this case more sockets must be created to simulate
+	 * additional server threads created from resent requests).
+	 *  
+	 *  @param ackProcess					the ProcessType value for the process sending ACKs
+	 *  @param ackSocket					the DatagramSocket that should be used to communicate with ackProcess
+	 *  @param ackAddr						the InetAddress object belonging to ackProcess
+	 *  @param ackPort						the port number used by ackProcess
+	 *  @param dataProcess					the ProcessType value for the process sending DATAs
+	 *  @param dataSocket					the DatagramSocket that should be used to communicate with dataProcess
+	 *  @param dataAddr						the InetAddress object belonging to dataProcess
+	 *  @param dataPort						the port number used by dataProcess
+	 *  @param expectedRetransmits  		the number of retransmissions expected to be made by both sides as a result of delay
+	 *  @param delayedPacketType  			the type of packet being dropped
+	 *  @throws IllegalArgumentException	if dropped packets > 2 (3 allowed retransmissions so transfer is cancelled if all are dropped)
+	 */
+	private void handleDelayedPacketRetransmits(ProcessType ackProcess, DatagramSocket ackSocket, InetAddress ackAddr, int ackPort,
+			ProcessType dataProcess, DatagramSocket dataSocket, InetAddress dataAddr, int dataPort, int expectedRetransmits, 
+			PacketType delayedPacketType) {
+		
+//		if (droppedPackets > 2)
+//			throw new IllegalArgumentException("Invalid argument: droppedPackets cannot exceed 2");
+		
+		System.out.println("\n\tGET AND SEND RETRANSMITS");
+		
+		if (delayedPacketType == PacketType.DATA && expectedRetransmits == 2) {
+			// get retransmitted ACK
+			receivePacketFromProcess(ackSocket, ackProcess, "retransmitted ACK");			
+	
+			// send retransmitted ACK (should be ignored)
+			sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), dataAddr, dataPort);
+			sendPacketToProcess(dataSocket, dataProcess, "retransmitted ACK");
+		}
+
+		// get retransmitted DATA
+		receivePacketFromProcess(dataSocket, dataProcess, "retransmitted DATA");
+		//data = new DatagramPacket(receivePacket.getData(), receivePacket.getLength());
+
+		// send retransmitted DATA (should be acknowledged by ACK w/ same block num)
+		sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), ackAddr, ackPort);
+		sendPacketToProcess(ackSocket, ackProcess, "retransmitted DATA");
+		
+		if ( (delayedPacketType == PacketType.ACK && expectedRetransmits == 1) ||
+				delayedPacketType == PacketType.DATA) {
 
 			// get retransmitted ACK
 			receivePacketFromProcess(ackSocket, ackProcess, "retransmitted ACK");			
