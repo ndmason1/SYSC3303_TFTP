@@ -25,7 +25,7 @@ import tftp.server.thread.WorkerThread;
 
 public class Sender {
 	
-	private final static int DEFAULT_RETRY_TRANSMISSION = 3;
+	private final static int DEFAULT_RETRY_TRANSMISSION = 2;
 
 	private FileInputStream fileReader;
 	private DatagramSocket socket;
@@ -112,7 +112,7 @@ public class Sender {
     					System.out.println("Can not complete sending Request, terminated");
     					return;
     				}
-    				System.out.println(sendPacket);
+    				
     				if (!duplicatePacket){
     					PacketUtil.sendPacketToProcess(threadLabel, socket, sendPacket, receiverProcess, "DATA");
     				}

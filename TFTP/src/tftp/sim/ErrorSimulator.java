@@ -205,11 +205,11 @@ public class ErrorSimulator {
 		
 		if(receiverProcessSelection == ProcessType.SERVER){
 			System.out.println("\n(1) WRQ(DATA)");
-			System.out.println("(2) ACK");
+			System.out.println("(2) ACK(must start with RRQ)");
 			packetTypeSelection = PacketType.WRQ;
 		}else{
 			System.out.println("\n(1) RRQ(DATA)");
-			System.out.println("(2) ACK");
+			System.out.println("(2) ACK(must start with WRQ)");
 			packetTypeSelection = PacketType.RRQ;
 		}
 		
@@ -1937,7 +1937,74 @@ public class ErrorSimulator {
 							sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "ACK/ERROR");
 						}
 					}else{
+						//WRQ ACK
+						sendPacket = new DatagramPacket(originalReqData, originalReqLength, serverIP, Server.SERVER_PORT);
+						try {
+							serverSendRecvSocket.send(sendPacket);
+						} catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
 						
+						while (true){
+							receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ACK/ERROR");
+							originalServerTID = receivePacket.getPort();
+							
+							sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
+							sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "ACK/ERROR");
+							
+							receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ERROR");
+							
+							if (receivePacket.getData()[3] == blockNumSelection){
+								sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, originalServerTID);
+								sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ERROR");
+								
+								receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ACK/ERROR");
+								
+								sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
+								sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "ACK/ERROR");
+								
+								receivePacketFromProcess(clientSendRecvSocket, ProcessType.CLIENT, "DATA/ERROR");
+								
+								byte[] store = new byte[PacketUtil.BUF_SIZE];
+								int storeLength = receivePacket.getLength();
+								System.arraycopy(receivePacket.getData(), 0, store, 0, storeLength);
+								
+								DatagramPacket recData = new DatagramPacket(store, storeLength, clientIP, clientPort);
+								
+								for(int i = 0; i < numDups; i++){
+									receivePacketFromProcess(serverSendRecvSocket, ProcessType.SERVER, "ACK/ERROR");
+									if (receivePacket.getData()[3] == blockNumSelection){
+										System.out.println("================================================================");
+										System.out.printf("\nDuplicate ACK Packet %d times received with Block number %d\n", i+1, receivePacket.getData()[3]);
+										System.out.println("================================================================");
+									}else{
+										System.out.println("Duplicate ACK Packet Test Failed");
+										printEndSimulation();
+										clientSendRecvSocket.close();
+										return;
+									}
+									
+									sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), clientIP, clientPort);
+									sendPacketToProcess(clientSendRecvSocket, ProcessType.CLIENT, "ACK/ERROR");
+									
+								}
+								
+								sendPacket = new DatagramPacket(recData.getData(), recData.getLength(), serverIP, originalServerTID);
+								sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ERROR");
+								
+								finishTransfer(ProcessType.SERVER, serverSendRecvSocket, serverIP, originalServerTID, 
+										ProcessType.CLIENT, clientSendRecvSocket, clientIP, clientPort);
+								
+								System.out.println("Finished Test, Duplicate ACK Packet Test Success");
+								printEndSimulation();
+								clientSendRecvSocket.close();
+								return;
+							}
+							
+							sendPacket = new DatagramPacket(receivePacket.getData(), receivePacket.getLength(), serverIP, originalServerTID);
+							sendPacketToProcess(serverSendRecvSocket, ProcessType.SERVER, "DATA/ERROR");
+						}
 					}
 				}
 				// RRQ OR DATA DUPLICATE PACKET
