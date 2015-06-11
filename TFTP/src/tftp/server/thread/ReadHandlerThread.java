@@ -44,8 +44,6 @@ public class ReadHandlerThread extends WorkerThread {
 	@Override
 	public void run() {
 		
-		printToConsole("processing request");
-		
 		PacketUtil packetUtil = new PacketUtil(reqPacket.getAddress(), reqPacket.getPort());
 		String filename = null;
 		

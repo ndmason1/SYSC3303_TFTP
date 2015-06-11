@@ -58,7 +58,7 @@ public class ErrorSimUtil {
 			break;			
 		}
 
-		DatagramPacket newPacket = new DatagramPacket(newData, newLength);
+		DatagramPacket newPacket = new DatagramPacket(newData, newLength, originalPacket.getAddress(), originalPacket.getPort());
 		return newPacket;
 
 	}
